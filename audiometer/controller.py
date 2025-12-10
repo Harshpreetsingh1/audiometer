@@ -151,21 +151,52 @@ class Controller:
             return False
 
     def audibletone(self, freq, current_level_dBHL, earside):
-        self.key = ''
-        while self.key != 'space':
+        """Automatic tone familiarization via button press.
+        
+        Plays a tone at increasing volume levels until the patient confirms
+        they can hear it by pressing the button.
+        
+        Args:
+            freq: Frequency in Hz
+            current_level_dBHL: Starting level in dBHL
+            earside: 'left' or 'right'
+        
+        Returns:
+            The confirmed level in dBHL when button is pressed, or max level if reached.
+        """
+        max_level_dBHL = 80  # Safety limit to prevent hearing damage
+        button_timeout = self.config.tone_duration + 1  # Give user time to react
+        
+        while current_level_dBHL <= max_level_dBHL:
             if self.dBHL2dBFS(freq, current_level_dBHL) > 0:
-                print("WARNING: Signal is distorted. Decrease the current "
-                      "level!")
+                print(f"WARNING: Signal is distorted at {current_level_dBHL} dBHL. "
+                      "Skipping to next level.")
+                current_level_dBHL += 10
+                continue
+            
+            print(f"Playing tone at {current_level_dBHL} dBHL. Press button if audible...")
+            self._rpd.clear()
             self._audio.start(freq,
                               self.dBHL2dBFS(freq, current_level_dBHL),
                               earside)
-            self.key = self._rpd.wait_for_arrow()
-            if self.key == 'arrow_left':
-                current_level_dBHL -= 5
-            if self.key == 'arrow_right':
-                current_level_dBHL += 5
+            time.sleep(self.config.tone_duration)
+            
+            # Check if button was pressed during tone
+            button_pressed = self._rpd.click_down()
             self._audio.stop()
-
+            
+            if button_pressed:
+                print(f"Button confirmed at {current_level_dBHL} dBHL")
+                # Wait for button release
+                self._rpd.wait_for_click_up(timeout=2)
+                time.sleep(0.5)
+                return current_level_dBHL
+            
+            # Increase level and try again
+            current_level_dBHL += 10
+            time.sleep(0.5)
+        
+        print(f"Reached maximum safety level ({max_level_dBHL} dBHL) without confirmation")
         return current_level_dBHL
 
     def wait_for_click(self):

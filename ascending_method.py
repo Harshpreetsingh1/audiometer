@@ -46,16 +46,15 @@ class AscendingMethod:
     def familiarization(self):
         logging.info("Begin Familiarization")
 
-        print("\nSet a clearly audible tone "
-              "via the arrow keys (left & right) on the keyboard.\nConfirm "
-              "with the Space Key\n")
+        print("\nStarting automatic tone familiarization...\n"
+              "Press the button when you hear the tone.\n")
 
         self.current_level = self.ctrl.audibletone(
                              self.freq,
                              self.ctrl.config.beginning_fam_level,
                              self.earside)
 
-        print("\nTo begin, click once")
+        print("\nTo begin the hearing test, click once")
         self.ctrl.wait_for_click()
 
         while self.click:
