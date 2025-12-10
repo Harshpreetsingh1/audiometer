@@ -26,8 +26,8 @@ logging.basicConfig(level=logging.DEBUG, format='%(levelname)s:%(message)s',
 
 class AscendingMethod:
 
-    def __init__(self):
-        self.ctrl = controller.Controller()
+    def __init__(self, device_id=None):
+        self.ctrl = controller.Controller(device_id=device_id)
         self.current_level = 0
         self.click = True
 
@@ -111,14 +111,28 @@ class AscendingMethod:
 
         if not self.ctrl.config.logging:
             logging.disable(logging.CRITICAL)
+        # Compute total steps for progress reporting
+        ears = list(self.ctrl.config.earsides)
+        freqs = list(self.ctrl.config.freqs)
+        total_steps = len(ears) * len(freqs) if ears and freqs else 0
+        step_count = 0
 
-        for self.earside in self.ctrl.config.earsides:
-            for self.freq in self.ctrl.config.freqs:
+        for self.earside in ears:
+            for self.freq in freqs:
                 logging.info('freq:%s earside:%s', self.freq, self.earside)
                 try:
                     self.hearing_test()
                     self.ctrl.save_results(self.current_level, self.freq,
                                            self.earside)
+
+                    # Progress reporting to UI if available
+                    step_count += 1
+                    try:
+                        if hasattr(self.ctrl, 'ui_window') and self.ctrl.ui_window is not None and total_steps > 0:
+                            percent = int((step_count / total_steps) * 100)
+                            self.ctrl.ui_window.write_event_value('-PROGRESS-', percent)
+                    except Exception:
+                        pass
 
                 except OverflowError:
                     print("The signal is distorted. Possible causes are "
@@ -128,7 +142,10 @@ class AscendingMethod:
                     continue
 
                 except KeyboardInterrupt:
-                    sys.exit('\nInterrupted by user')
+                    # In a GUI context, calling sys.exit() will terminate the whole
+                    # application. Re-raise the exception so the calling thread
+                    # can handle it and report the error to the UI instead.
+                    raise
 
     def __enter__(self):
         return self

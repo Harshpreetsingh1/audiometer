@@ -8,7 +8,7 @@ import csv
 import random
 
 
-def config():
+def config(args=None):
 
     parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
     parser.add_argument(
@@ -43,7 +43,7 @@ def config():
     parser.add_argument("--freqs", type=float, nargs='+', default=[1000, 1500,
                         2000, 3000, 4000, 6000, 8000, 750, 500, 250, 125],
                         help='The size '
-                        'and number of frequencies are shown in'
+                         'and number of frequencies are shown in'
                         'DIN60645-1 ch. 6.1.1. Their order'
                         'are described in ISO8253-1 ch. 6.1')
     parser.add_argument("--conduction", type=str, default='air', help="How "
@@ -73,19 +73,28 @@ def config():
     parser.add_argument("--cal6000", default=[6000, -70, -5])
     parser.add_argument("--cal8000", default=[8000, -76, 1])
 
-    args = parser.parse_args()
+    # Parse args - if None is passed, use empty list
+    # This prevents argparse from trying to read sys.argv
+    if args is None:
+        args = []
+    
+    parsed_args = parser.parse_args(args)
 
-    if not os.path.exists(args.results_path):
-        os.makedirs(args.results_path)
+    if not os.path.exists(parsed_args.results_path):
+        os.makedirs(parsed_args.results_path)
 
-    return args
+    return parsed_args
 
 
 class Controller:
 
-    def __init__(self):
+    def __init__(self, device_id=None):
 
-        self.config = config()
+        self.config = config(args=[])
+        
+        # Override the default device if one was passed from the UI
+        if device_id is not None:
+            self.config.device = int(device_id)
 
         if self.config.carry_on:
             self.csvfile = open(os.path.join(self.config.results_path,
@@ -165,7 +174,6 @@ class Controller:
             The confirmed level in dBHL when button is pressed, or max level if reached.
         """
         max_level_dBHL = 80  # Safety limit to prevent hearing damage
-        button_timeout = self.config.tone_duration + 1  # Give user time to react
         
         while current_level_dBHL <= max_level_dBHL:
             if self.dBHL2dBFS(freq, current_level_dBHL) > 0:
@@ -175,24 +183,33 @@ class Controller:
                 continue
             
             print(f"Playing tone at {current_level_dBHL} dBHL. Press button if audible...")
+            
+            # Clear any previous button state
             self._rpd.clear()
+            
+            # Start playing tone
             self._audio.start(freq,
                               self.dBHL2dBFS(freq, current_level_dBHL),
                               earside)
+            
+            # Let tone play for the configured duration
             time.sleep(self.config.tone_duration)
+            
+            # Stop playing
+            self._audio.stop()
             
             # Check if button was pressed during tone
             button_pressed = self._rpd.click_down()
-            self._audio.stop()
             
             if button_pressed:
                 print(f"Button confirmed at {current_level_dBHL} dBHL")
-                # Wait for button release
+                # Wait for button release with timeout
                 self._rpd.wait_for_click_up(timeout=2)
                 time.sleep(0.5)
                 return current_level_dBHL
             
-            # Increase level and try again
+            # Button not pressed, increase level and try again
+            print(f"No button press detected. Increasing to {current_level_dBHL + 10} dBHL...")
             current_level_dBHL += 10
             time.sleep(0.5)
         
