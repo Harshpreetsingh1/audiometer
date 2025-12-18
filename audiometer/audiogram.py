@@ -3,6 +3,7 @@
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
+import os
 
 
 def set_audiogram_parameters(dBHL, freqs, conduction, masking, earside,
@@ -75,8 +76,13 @@ def set_audiogram_parameters(dBHL, freqs, conduction, masking, earside,
             raise NameError("Conduction has to be 'air' or 'bone'")
     elif not earside == 'right' or not earside == 'left':
         raise NameError("'left' or 'right'?")
-    lines = ax.plot(dBHL, color=color, marker=marker, markersize=5,
-                    markeredgewidth=1, fillstyle='none')
+    # Plot with connecting line (solid for air conduction, dashed for bone)
+    linestyle = '-' if conduction == 'air' else '--'
+    lines = ax.plot(dBHL, color=color, marker=marker, markersize=7,
+                    markeredgewidth=2, markeredgecolor=color,
+                    linestyle=linestyle, linewidth=2, fillstyle='none',
+                    label='{} ear'.format(earside.capitalize()))
+    ax.legend(loc='best')
     gridlines = ax.get_xgridlines() + ax.get_ygridlines()
     for line in gridlines:
         line.set_linestyle('-')
@@ -87,7 +93,11 @@ def make_audiogram(filename, results_path=None):
 
         if results_path is None:
             results_path = 'audiometer/results'
-        data = _read_audiogram(filename)
+        # Ensure results_path ends with separator for proper path joining
+        if not results_path.endswith(os.sep) and not results_path.endswith('/'):
+            results_path = results_path + os.sep
+        
+        data = _read_audiogram(filename, results_path)
         conduction = [option for cond, option, none in data
                       if cond == 'Conduction'][0]
         masking = [option for mask, option, none in data
@@ -95,10 +105,12 @@ def make_audiogram(filename, results_path=None):
 
         if 'right' in [side for freq, level, side in data] and (
            'left' in [side for freq, level, side in data]):
-            f, (ax1, ax2) = plt.subplots(ncols=2)
+            f, (ax1, ax2) = plt.subplots(ncols=2, figsize=(14, 6))
+            f.suptitle('Audiogram - Hearing Threshold Levels', fontsize=14, fontweight='bold')
         else:
             ax1, ax2 = None, None
-            f = plt.figure()
+            f = plt.figure(figsize=(7, 6))
+            f.suptitle('Audiogram - Hearing Threshold Levels', fontsize=14, fontweight='bold')
 
         if 'right' in [side for freq, level, side in data]:
             dBHL, freqs = _extract_parameters(data, 'right')
@@ -110,11 +122,31 @@ def make_audiogram(filename, results_path=None):
             set_audiogram_parameters(dBHL, freqs, conduction, masking,
                                      earside='left', ax=ax2)
 
-        f.savefig('{}{}.pdf'.format(results_path, filename))
+        # Save PDF with proper path handling
+        pdf_path = os.path.join(results_path, filename + '.pdf')
+        f.savefig(pdf_path, dpi=300, bbox_inches='tight')
+        print(f"Audiogram saved to: {pdf_path}")
 
 
-def _read_audiogram(filename):
-    with open('audiometer/results/{}'.format(filename), 'r') as csvfile:
+def _read_audiogram(filename, results_path=None):
+    """Read audiogram data from CSV file.
+    
+    Args:
+        filename: CSV filename (e.g., 'result_2025-12-15_22-08-12.csv')
+        results_path: Path to results directory (supports user folders)
+    
+    Returns:
+        List of CSV rows
+    """
+    if results_path is None:
+        results_path = 'audiometer/results'
+    
+    # Ensure proper path joining
+    if not results_path.endswith(os.sep) and not results_path.endswith('/'):
+        results_path = results_path + os.sep
+    
+    csv_path = os.path.join(results_path, filename)
+    with open(csv_path, 'r') as csvfile:
         reader = csv.reader(csvfile)
         data = [data for data in reader]
     return data

@@ -54,6 +54,21 @@ class TestToneGenerator(unittest.TestCase):
         self.assertGreater(audio._release, 0)
 
     @patch('audiometer.tone_generator.sd.OutputStream')
+    @patch('audiometer.tone_generator.sd.query_devices')
+    def test_audiostream_respects_device_channels(self, mock_query, mock_stream_class):
+        """AudioStream should request mono if device only has one output channel."""
+        mock_stream = MagicMock()
+        mock_stream_class.return_value = mock_stream
+        mock_query.return_value = {'max_output_channels': 1}
+
+        audio = tone_generator.AudioStream(device=0, attack=30, release=40)
+
+        # Ensure we requested a mono stream
+        mock_stream_class.assert_called_once()
+        args, kwargs = mock_stream_class.call_args
+        self.assertEqual(kwargs.get('channels'), 1)
+
+    @patch('audiometer.tone_generator.sd.OutputStream')
     def test_audiostream_init_invalid_attack(self, mock_stream_class):
         """Test AudioStream raises error for invalid attack value."""
         mock_stream = MagicMock()
@@ -127,6 +142,48 @@ class TestToneGenerator(unittest.TestCase):
             self.assertIsNotNone(audio)
 
         mock_stream.stop.assert_called()
+
+    @patch('audiometer.tone_generator.sd.OutputStream')
+    def test_callback_writes_only_one_channel_left(self, mock_stream_class):
+        """Callback should write only to left channel when earside='left'."""
+        mock_stream = MagicMock()
+        mock_stream_class.return_value = mock_stream
+
+        audio = tone_generator.AudioStream(device=None, attack=30, release=40)
+        # Simulate parameters like after start()
+        audio._channel = 0
+        audio._callback_parameters = (1.0, 0.1, 1000)
+        audio._index = 0
+        audio._last_gain = 0
+
+        frames = 16
+        outdata = np.zeros((frames, 2), dtype=float)
+        audio._callback(outdata, frames, None, tone_generator.sd.CallbackFlags())
+
+        # Left channel should contain signal; right channel should be all zeros
+        self.assertTrue((outdata[:, 0] != 0).any())
+        self.assertTrue((outdata[:, 1] == 0).all())
+
+    @patch('audiometer.tone_generator.sd.OutputStream')
+    def test_callback_writes_only_one_channel_right(self, mock_stream_class):
+        """Callback should write only to right channel when earside='right'."""
+        mock_stream = MagicMock()
+        mock_stream_class.return_value = mock_stream
+
+        audio = tone_generator.AudioStream(device=None, attack=30, release=40)
+        # Simulate parameters like after start()
+        audio._channel = 1
+        audio._callback_parameters = (1.0, 0.1, 1000)
+        audio._index = 0
+        audio._last_gain = 0
+
+        frames = 16
+        outdata = np.zeros((frames, 2), dtype=float)
+        audio._callback(outdata, frames, None, tone_generator.sd.CallbackFlags())
+
+        # Right channel should contain signal; left channel should be all zeros
+        self.assertTrue((outdata[:, 1] != 0).any())
+        self.assertTrue((outdata[:, 0] == 0).all())
 
 
 if __name__ == '__main__':

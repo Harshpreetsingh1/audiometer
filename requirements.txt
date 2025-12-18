@@ -3,3 +3,5 @@ sounddevice>=0.4.5
 matplotlib>=3.4.0
 PySimpleGUI>=4.60.0
 openpyxl>=3.0.0
+keyboard>=0.13.5
+ttkbootstrap>=1.10.1

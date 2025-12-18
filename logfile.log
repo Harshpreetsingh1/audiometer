@@ -1,0 +1,2 @@
+INFO:keyboard module not available; using UI-only responder
+INFO:Randomized ear order: ['right', 'left']

@@ -100,6 +100,6 @@ def run_test_thread(device_id, window):
 - Check debug_gui.py output if needed for detailed logging
 
 ## Additional Notes
-- All files compile without syntax errors
+- All files compiled without syntax errors
 - AscendingMethod, Controller, and AudioStream initialize successfully in tests
 - The fixes preserve the original functionality while making the code GUI-safe

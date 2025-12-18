@@ -6,6 +6,8 @@ import time
 import os
 import csv
 import random
+import re
+import logging
 
 
 def config(args=None):
@@ -54,6 +56,8 @@ def config(args=None):
                         default='audiometer/results/')
     parser.add_argument("--filename", default='result_{}'.format(time.strftime(
                         '%Y-%m-%d_%H-%M-%S')) + '.csv')
+    parser.add_argument("--subject-name", type=str, default=None,
+                        help="Subject/patient name for organizing results in user folders")
 
     parser.add_argument("--carry-on", type=str)
     parser.add_argument("--logging", action='store_true')
@@ -88,13 +92,29 @@ def config(args=None):
 
 class Controller:
 
-    def __init__(self, device_id=None):
+    def __init__(self, device_id=None, subject_name=None):
 
         self.config = config(args=[])
         
         # Override the default device if one was passed from the UI
         if device_id is not None:
             self.config.device = int(device_id)
+        
+        # Override subject name if provided
+        if subject_name is not None:
+            self.config.subject_name = subject_name
+        
+        # Create user folder structure if subject name is provided
+        if hasattr(self.config, 'subject_name') and self.config.subject_name:
+            # Sanitize subject name for use as folder name
+            sanitized_name = self._sanitize_folder_name(self.config.subject_name)
+            # Create user-specific results folder
+            user_results_path = os.path.join(self.config.results_path, sanitized_name)
+            if not os.path.exists(user_results_path):
+                os.makedirs(user_results_path)
+            # Update results path to user folder
+            self.config.results_path = user_results_path
+            print(f"Results will be saved to user folder: {user_results_path}")
 
         if self.config.carry_on:
             self.csvfile = open(os.path.join(self.config.results_path,
@@ -131,35 +151,101 @@ class Controller:
                                                  self.config.attack,
                                                  self.config.release)
         self._rpd = responder.Responder(self.config.tone_duration)
+    
+    def _sanitize_folder_name(self, name):
+        """Sanitize subject name for use as folder name.
+        
+        Removes or replaces invalid characters for filesystem folder names.
+        
+        Args:
+            name: Original subject name
+            
+        Returns:
+            Sanitized folder name safe for filesystem use
+        """
+        # Remove leading/trailing whitespace
+        name = name.strip()
+        
+        # Replace invalid filesystem characters with underscore
+        # Invalid chars: < > : " / \ | ? *
+        invalid_chars = r'[<>:"/\\|?*]'
+        sanitized = re.sub(invalid_chars, '_', name)
+        
+        # Remove multiple consecutive underscores
+        sanitized = re.sub(r'_+', '_', sanitized)
+        
+        # Remove leading/trailing underscores and dots (Windows restriction)
+        sanitized = sanitized.strip('_.')
+        
+        # Ensure name is not empty
+        if not sanitized:
+            sanitized = 'Unknown_Subject'
+        
+        # Limit length to 255 characters (filesystem limit)
+        if len(sanitized) > 255:
+            sanitized = sanitized[:255]
+        
+        return sanitized
 
-    def clicktone(self, freq, current_level_dBHL, earside):
+    def clicktone(self, freq, current_level_dBHL, earside, stop_event=None):
+        """Play a tone and check for patient response.
+        
+        Args:
+            freq: Frequency in Hz
+            current_level_dBHL: Level in dBHL
+            earside: 'left' or 'right'
+            stop_event: Optional threading.Event to check for stop requests
+        
+        Returns:
+            True if patient responded, False otherwise
+        """
         if self.dBHL2dBFS(freq, current_level_dBHL) > 0:
             raise OverflowError
+        
+        # Check stop event before starting
+        if stop_event and stop_event.is_set():
+            return False
+        
         self._rpd.clear()
         self._audio.start(freq, self.dBHL2dBFS(freq, current_level_dBHL),
-                          earside)
-        time.sleep(self.config.tone_duration)
+                  earside)
+        
+        # Sleep in small increments, checking stop_event
+        if not self._progress_sleep(self.config.tone_duration, stop_event):
+            # Stop was requested - stop audio immediately
+            self._audio.stop()
+            return False
+        
         click_down = self._rpd.click_down()
         self._audio.stop()
+        
         if click_down:
             start = time.time()
             self._rpd.wait_for_click_up()
             end = time.time()
             if (end - start) <= self.config.tolerance:
-                time.sleep(random.uniform(self.config.pause_time[0],
-                           self.config.pause_time[1]))
+                # Check stop event before pause
+                if stop_event and stop_event.is_set():
+                    return False
+                self._progress_sleep(random.uniform(self.config.pause_time[0],
+                           self.config.pause_time[1]), stop_event)
                 return True
             else:
-                time.sleep(random.uniform(self.config.pause_time[0],
-                           self.config.pause_time[1]))
+                # Check stop event before pause
+                if stop_event and stop_event.is_set():
+                    return False
+                self._progress_sleep(random.uniform(self.config.pause_time[0],
+                           self.config.pause_time[1]), stop_event)
                 return False
-
         else:
-            time.sleep(random.uniform(self.config.pause_time[0],
-                                      self.config.pause_time[1]))
+            # Check stop event before pause
+            if stop_event and stop_event.is_set():
+                return False
+            self._progress_sleep(random.uniform(self.config.pause_time[0],
+                                      self.config.pause_time[1]), stop_event)
             return False
 
-    def audibletone(self, freq, current_level_dBHL, earside):
+    def audibletone(self, freq, current_level_dBHL, earside, stop_event=None):
         """Automatic tone familiarization via button press.
         
         Plays a tone at increasing volume levels until the patient confirms
@@ -169,6 +255,7 @@ class Controller:
             freq: Frequency in Hz
             current_level_dBHL: Starting level in dBHL
             earside: 'left' or 'right'
+            stop_event: Optional threading.Event to check for stop requests
         
         Returns:
             The confirmed level in dBHL when button is pressed, or max level if reached.
@@ -176,6 +263,11 @@ class Controller:
         max_level_dBHL = 80  # Safety limit to prevent hearing damage
         
         while current_level_dBHL <= max_level_dBHL:
+            # Check stop event at start of each iteration
+            if stop_event and stop_event.is_set():
+                self.stop_audio_immediately()
+                return current_level_dBHL  # Return current level if stopped
+            
             if self.dBHL2dBFS(freq, current_level_dBHL) > 0:
                 print(f"WARNING: Signal is distorted at {current_level_dBHL} dBHL. "
                       "Skipping to next level.")
@@ -192,8 +284,11 @@ class Controller:
                               self.dBHL2dBFS(freq, current_level_dBHL),
                               earside)
             
-            # Let tone play for the configured duration
-            time.sleep(self.config.tone_duration)
+            # Let tone play for the configured duration (checking stop_event)
+            if not self._progress_sleep(self.config.tone_duration, stop_event):
+                # Stop was requested - stop audio immediately
+                self._audio.stop()
+                return current_level_dBHL
             
             # Stop playing
             self._audio.stop()
@@ -205,16 +300,71 @@ class Controller:
                 print(f"Button confirmed at {current_level_dBHL} dBHL")
                 # Wait for button release with timeout
                 self._rpd.wait_for_click_up(timeout=2)
-                time.sleep(0.5)
+                # Check stop event before pause
+                if stop_event and stop_event.is_set():
+                    return current_level_dBHL
+                self._progress_sleep(0.5, stop_event)
                 return current_level_dBHL
             
             # Button not pressed, increase level and try again
             print(f"No button press detected. Increasing to {current_level_dBHL + 10} dBHL...")
             current_level_dBHL += 10
-            time.sleep(0.5)
+            # Check stop event before pause
+            if stop_event and stop_event.is_set():
+                return current_level_dBHL
+            self._progress_sleep(0.5, stop_event)
         
         print(f"Reached maximum safety level ({max_level_dBHL} dBHL) without confirmation")
         return current_level_dBHL
+
+    def _progress_sleep(self, total_time, stop_event=None):
+        """Sleep in small increments and check stop_event to allow immediate cancellation.
+        
+        Args:
+            total_time: Total time to sleep in seconds
+            stop_event: Optional threading.Event to check for stop requests
+        
+        Returns:
+            True if sleep completed normally, False if stop_event was set
+        """
+        if stop_event is None:
+            # No stop event, just sleep normally
+            time.sleep(total_time)
+            return True
+        
+        # Sleep in small increments, checking stop_event frequently
+        start = time.time()
+        chunk_size = 0.05  # Check every 50ms for responsiveness
+        
+        while time.time() - start < total_time:
+            if stop_event.is_set():
+                # Stop requested - return immediately
+                return False
+            # Sleep in small chunks
+            remaining = total_time - (time.time() - start)
+            time.sleep(min(chunk_size, remaining))
+        
+        # Check one final time
+        if stop_event and stop_event.is_set():
+            return False
+        
+        return True
+    
+    def stop_audio_immediately(self):
+        """Force stop audio playback immediately.
+        
+        This method directly stops and closes the audio stream,
+        useful for emergency stops when stop_event is set.
+        """
+        try:
+            if hasattr(self, '_audio') and self._audio:
+                self._audio.stop()
+                # Give it a moment to stop, then close if needed
+                time.sleep(0.05)
+                # Note: We don't close here as it might be needed again
+                # The audio stream will be properly closed when Controller is destroyed
+        except Exception as e:
+            logging.warning(f"Error stopping audio immediately: {e}")
 
     def wait_for_click(self):
         self._rpd.clear()
