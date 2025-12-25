@@ -315,7 +315,7 @@ class AscendingMethod:
         # Modified Hughson-Westlake: find threshold where 3 of 5 responses occur
         three_answers = False
         iteration_count = 0
-        max_iterations = 20  # Safety limit to prevent infinite loops
+        max_iterations = 5  # Safety limit: 5 iterations per ear (10 total for both ears)
         
         while not three_answers and iteration_count < max_iterations:
             # Check stop event at start of outer loop
@@ -477,8 +477,9 @@ class AscendingMethod:
             try:
                 if hasattr(self.ctrl, 'ui_window') and self.ctrl.ui_window is not None:
                     self.ctrl.ui_window.write_event_value('-PROGRESS-', int(percentage))
-            except Exception:
-                pass
+            except Exception as e:
+                # Log but don't fail - this is backward compatibility code
+                logging.debug(f"Error updating legacy UI window (non-critical): {e}")
             
             logging.info(
                 f"Progress: {self._completed_steps}/{self._total_steps} "
@@ -597,11 +598,21 @@ class AscendingMethod:
                     # Run the hearing test for this frequency/ear combination
                     self.hearing_test()
                     
+                    # Check stop event immediately after hearing_test() to prevent saving junk data
+                    if self.stop_event.is_set():
+                        logging.info("Test stop requested after hearing_test(). Skipping save.")
+                        return
+                    
                     # Verify we have a valid threshold
                     if self.current_level is None:
                         raise ValueError("Threshold determination failed")
                     
-                    # Save the determined threshold
+                    # CRITICAL: Double-check stop event BEFORE saving to prevent junk data
+                    if self.stop_event.is_set():
+                        logging.info("Test stop requested before save_results(). Skipping save to prevent data corruption.")
+                        return
+                    
+                    # Save the determined threshold (only if test completed successfully)
                     self.ctrl.save_results(self.current_level, self.freq,
                                            self.earside)
                     

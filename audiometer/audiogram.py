@@ -1,5 +1,10 @@
 """Audiogram."""
 
+# CRITICAL: Set matplotlib backend BEFORE importing pyplot
+# This prevents GUI crashes when called from background threads
+import matplotlib
+matplotlib.use('Agg')  # Non-interactive backend for thread safety
+
 import numpy as np
 import csv
 import matplotlib.pyplot as plt
@@ -50,36 +55,40 @@ def set_audiogram_parameters(dBHL, freqs, conduction, masking, earside,
     #  to 20 dB on the hearing level axis (ISO 8253-1 (2011) ch. 10)
     ax.set_aspect(0.9 / ax.get_data_ratio())
     ax.set_title('Hearing Level - {} ear'.format(earside))
+    
+    # CLINICAL STANDARD: Right Ear = Red (O), Left Ear = Blue (X)
+    # Following ANSI/ISO 8253-1 audiometric standards
     if earside == 'left':
-        color = 'b'
+        color = 'b'  # Blue for left ear (clinical standard)
         if conduction == 'air' and masking == 'off':
-            marker = 'x'
+            marker = 'x'  # X marker for left ear air conduction (clinical standard)
         elif conduction == 'air' and masking == 'on':
-                marker = 's'
+            marker = 's'  # Square for left ear air conduction with masking
         elif conduction == 'bone' and masking == 'off':
-                marker = '4'
+            marker = '4'  # Triangle down for left ear bone conduction
         elif conduction == 'bone' and masking == 'on':
-                marker = '*'
+            marker = '*'  # Star for left ear bone conduction with masking
         else:
             raise NameError("Conduction has to be 'air' or 'bone'")
     elif earside == 'right':
-        color = 'r'
+        color = 'r'  # Red for right ear (clinical standard)
         if conduction == 'air' and masking == 'off':
-            marker = 'o'
+            marker = 'o'  # Circle (O) marker for right ear air conduction (clinical standard)
         elif conduction == 'air' and masking == 'on':
-            marker = '^'
+            marker = '^'  # Triangle up for right ear air conduction with masking
         elif conduction == 'bone' and masking == 'off':
-            marker = '3'
+            marker = '3'  # Triangle left for right ear bone conduction
         elif conduction == 'bone' and masking == 'on':
-            marker = '8'
+            marker = '8'  # Octagon for right ear bone conduction with masking
         else:
             raise NameError("Conduction has to be 'air' or 'bone'")
     elif not earside == 'right' or not earside == 'left':
         raise NameError("'left' or 'right'?")
     # Plot with connecting line (solid for air conduction, dashed for bone)
+    # Ensure clinical standard styling: Right=Red(O), Left=Blue(X), inverted Y-axis
     linestyle = '-' if conduction == 'air' else '--'
-    lines = ax.plot(dBHL, color=color, marker=marker, markersize=7,
-                    markeredgewidth=2, markeredgecolor=color,
+    lines = ax.plot(dBHL, color=color, marker=marker, markersize=8,
+                    markeredgewidth=2.5, markeredgecolor=color,
                     linestyle=linestyle, linewidth=2, fillstyle='none',
                     label='{} ear'.format(earside.capitalize()))
     ax.legend(loc='best')
@@ -123,7 +132,9 @@ def make_audiogram(filename, results_path=None):
                                      earside='left', ax=ax2)
 
         # Save PDF with proper path handling
-        pdf_path = os.path.join(results_path, filename + '.pdf')
+        # Remove .csv extension if present, then add .pdf
+        base_filename = os.path.splitext(filename)[0]
+        pdf_path = os.path.join(results_path, base_filename + '.pdf')
         f.savefig(pdf_path, dpi=300, bbox_inches='tight')
         print(f"Audiogram saved to: {pdf_path}")
 

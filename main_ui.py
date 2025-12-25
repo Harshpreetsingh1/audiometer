@@ -13,6 +13,9 @@ import os
 import sys
 import time
 import uuid
+import logging
+import atexit
+import signal
 from datetime import datetime
 from pathlib import Path
 from ascending_method import AscendingMethod
@@ -38,6 +41,9 @@ class AudiometerUI(ttk.Window):
         self.last_progress = 0
         self.button_flash_active = False
         
+        # Register cleanup handlers for graceful shutdown
+        self._register_cleanup_handlers()
+        
         # Build UI
         self._create_widgets()
         self._setup_layout()
@@ -45,6 +51,57 @@ class AudiometerUI(ttk.Window):
         
         # Start UI update polling
         self._poll_ui_updates()
+    
+    def _register_cleanup_handlers(self):
+        """Register signal handlers and atexit callbacks for graceful shutdown."""
+        # Register atexit handler for cleanup on normal exit
+        atexit.register(self._cleanup_resources)
+        
+        # Register signal handlers for graceful shutdown (Unix/Linux/Mac)
+        if sys.platform != 'win32':
+            signal.signal(signal.SIGTERM, self._signal_handler)
+            signal.signal(signal.SIGINT, self._signal_handler)
+        else:
+            # Windows: Register handler for Ctrl+C (SIGINT)
+            signal.signal(signal.SIGINT, self._signal_handler)
+    
+    def _signal_handler(self, signum, frame):
+        """Handle shutdown signals gracefully."""
+        logging.info(f"Received signal {signum}. Initiating graceful shutdown...")
+        self._cleanup_resources()
+        # Close the window
+        self.destroy()
+        sys.exit(0)
+    
+    def _cleanup_resources(self):
+        """Clean up resources (audio streams, files, etc.) on shutdown."""
+        try:
+            logging.info("Cleaning up resources...")
+            
+            # Stop any running test
+            if self.is_running:
+                self.test_stop_requested = True
+                with self.test_lock:
+                    if self.current_test:
+                        try:
+                            self.current_test.stop_test()
+                        except Exception as e:
+                            logging.warning(f"Error stopping test during cleanup: {e}")
+            
+            # Clean up audio resources
+            with self.test_lock:
+                if self.current_test and hasattr(self.current_test, 'ctrl'):
+                    try:
+                        if hasattr(self.current_test.ctrl, '_audio'):
+                            self.current_test.ctrl._audio.close()
+                        if hasattr(self.current_test.ctrl, 'csvfile') and self.current_test.ctrl.csvfile:
+                            self.current_test.ctrl.csvfile.close()
+                    except Exception as e:
+                        logging.warning(f"Error closing audio/file resources: {e}")
+            
+            logging.info("Resource cleanup complete")
+        except Exception as e:
+            logging.error(f"Error during resource cleanup: {e}")
     
     def _create_widgets(self):
         """Create all UI widgets."""
@@ -294,7 +351,7 @@ class AudiometerUI(ttk.Window):
                     # Prefer USB devices
                     if 'USB' in d['name'] and default_device is None:
                         default_device = device_str
-            
+
             if device_list:
                 self.device_combo['values'] = device_list
                 if default_device:
@@ -329,10 +386,15 @@ class AudiometerUI(ttk.Window):
             self._show_error("Please enter a Patient ID!")
             return
         
-        # Validate Age (must be positive integer if provided)
+        # Validate Age (optional field - must be positive integer if provided)
         age_str = self.age_entry.get().strip()
+        # Only validate if age is not empty (treat empty as optional)
         if age_str:  # Age is optional, but if provided must be valid
-            if not age_str.isdigit() or int(age_str) <= 0:
+            if not age_str.isdigit():
+                self._show_error("Age must be a positive integer (e.g., 25) or leave blank.")
+                return
+            age_value = int(age_str)
+            if age_value <= 0:
                 self._show_error("Age must be a positive integer (e.g., 25) or leave blank.")
                 return
         
@@ -347,8 +409,8 @@ class AudiometerUI(ttk.Window):
             device_id = int(device_str.split(':')[0])
         except (ValueError, IndexError):
             self._show_error("Invalid device selection! Please select a valid audio device.")
-            return
-        
+        return
+
         # Check device channel capability (warn if mono only)
         try:
             devinfo = sd.query_devices(device_id)
@@ -450,6 +512,12 @@ class AudiometerUI(ttk.Window):
             ear_change_callback: Callback function for ear changes (receives 'left' or 'right')
         """
         try:
+            # CRITICAL FIX: Check stop flag BEFORE creating test instance (race condition prevention)
+            if self.test_stop_requested:
+                logging.info("Test stop requested before test creation. Aborting.")
+                self.after(0, self._on_test_stopped)
+                return
+            
             # Reset stop flag
             self.test_stop_requested = False
             
@@ -460,6 +528,13 @@ class AudiometerUI(ttk.Window):
                 progress_callback=progress_callback,
                 ear_change_callback=ear_change_callback
             )
+            
+            # CRITICAL FIX: Check stop flag AGAIN after creation (race condition window)
+            if self.test_stop_requested:
+                logging.info("Test stop requested immediately after test creation. Stopping.")
+                test.stop_test()
+                self.after(0, self._on_test_stopped)
+                return
             
             with self.test_lock:
                 self.current_test = test

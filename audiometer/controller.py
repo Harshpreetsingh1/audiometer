@@ -116,24 +116,47 @@ class Controller:
             self.config.results_path = user_results_path
             print(f"Results will be saved to user folder: {user_results_path}")
 
-        if self.config.carry_on:
-            self.csvfile = open(os.path.join(self.config.results_path,
-                                             self.config.carry_on), 'r+')
-            reader = csv.reader(self.csvfile)
-            for row in reader:
-                pass
-            last_freq = row[1]
-            self.config.freqs = self.config.freqs[self.config.freqs.index(
-                                                  int(last_freq)) + 1:]
-            self.config.earsides[0] = row[2]
-            self.writer = csv.writer(self.csvfile)
-        else:
-            self.csvfile = open(os.path.join(self.config.results_path,
-                                             self.config.filename), 'w')
-            self.writer = csv.writer(self.csvfile)
-            self.writer.writerow(['Conduction', self.config.conduction, None])
-            self.writer.writerow(['Masking', self.config.masking, None])
-            self.writer.writerow(['Level/dB', 'Frequency/Hz', 'Earside'])
+        # CRITICAL FIX: Ensure CSV file is properly closed on exception
+        self.csvfile = None
+        try:
+            if self.config.carry_on:
+                self.csvfile = open(os.path.join(self.config.results_path,
+                                                 self.config.carry_on), 'r+')
+                reader = csv.reader(self.csvfile)
+                for row in reader:
+                    pass
+                last_freq = row[1]
+                self.config.freqs = self.config.freqs[self.config.freqs.index(
+                                                      int(last_freq)) + 1:]
+                self.config.earsides[0] = row[2]
+                self.writer = csv.writer(self.csvfile)
+            else:
+                self.csvfile = open(os.path.join(self.config.results_path,
+                                                 self.config.filename), 'w')
+                self.writer = csv.writer(self.csvfile)
+                self.writer.writerow(['Conduction', self.config.conduction, None])
+                self.writer.writerow(['Masking', self.config.masking, None])
+                self.writer.writerow(['Level/dB', 'Frequency/Hz', 'Earside'])
+        except (PermissionError, OSError) as e:
+            # Close file if it was opened before error
+            if self.csvfile:
+                try:
+                    self.csvfile.close()
+                except:
+                    pass
+            raise RuntimeError(
+                f"Cannot create results file: {e}. "
+                f"Please ensure the directory is writable and no other "
+                f"application has the file open (e.g., Excel)."
+            ) from e
+        except Exception as e:
+            # Close file on any other error to prevent resource leak
+            if self.csvfile:
+                try:
+                    self.csvfile.close()
+                except:
+                    pass
+            raise
 
         self.cal_parameters = np.vstack((self.config.cal125,
                                         self.config.cal250,
@@ -156,6 +179,7 @@ class Controller:
         """Sanitize subject name for use as folder name.
         
         Removes or replaces invalid characters for filesystem folder names.
+        Handles Windows reserved names and invalid characters.
         
         Args:
             name: Original subject name
@@ -176,6 +200,16 @@ class Controller:
         
         # Remove leading/trailing underscores and dots (Windows restriction)
         sanitized = sanitized.strip('_.')
+        
+        # CRITICAL FIX: Check for Windows reserved names (CON, PRN, AUX, NUL, COM1-9, LPT1-9)
+        # These names cause OSError on Windows and must be avoided
+        windows_reserved = [
+            'CON', 'PRN', 'AUX', 'NUL',
+            'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+            'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9'
+        ]
+        if sanitized.upper() in windows_reserved:
+            sanitized = f"User_{sanitized}"
         
         # Ensure name is not empty
         if not sanitized:
