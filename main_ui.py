@@ -673,13 +673,8 @@ class AudiometerUI(ttk.Window):
     
     def _on_freq_change_safe(self, freq):
         """Thread-safe frequency indicator update."""
-        try:
-            self.status_label.config(
-                text=f"Current Frequency: {freq} Hz",
-                bootstyle="info"
-            )
-        except Exception as e:
-            print(f"Error updating frequency indicator: {e}")
+        # Frequency display removed from UI - method kept for API compatibility
+        pass
     
     def _on_ear_change_safe(self, ear_name):
         """Thread-safe ear indicator update with clinical standard colors."""

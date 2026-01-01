@@ -1,2 +1,2 @@
-INFO:Cleaning up resources...
-INFO:Resource cleanup complete
+INFO:keyboard module not available; using UI-only responder
+INFO:Randomized ear order: ['left', 'right']
