@@ -44,7 +44,7 @@ class AscendingMethod:
         - State is completely isolated between ears
     """
     
-    def __init__(self, device_id=None, subject_name=None, progress_callback=None, ear_change_callback=None):
+    def __init__(self, device_id=None, subject_name=None, progress_callback=None, ear_change_callback=None, freq_change_callback=None):
         """Initialize the ascending method test.
         
         Args:
@@ -52,6 +52,7 @@ class AscendingMethod:
             subject_name: Optional subject/patient name for organizing results in user folders.
             progress_callback: Optional callback function that receives progress percentage (0-100).
             ear_change_callback: Optional callback function called when ear changes (receives ear name: 'left' or 'right').
+            freq_change_callback: Optional callback function called when frequency changes (receives frequency in Hz).
         """
         self.ctrl = controller.Controller(device_id=device_id, subject_name=subject_name)
         
@@ -70,6 +71,7 @@ class AscendingMethod:
         self._current_earside = None
         self._progress_callback: Optional[Callable[[float], None]] = progress_callback
         self._ear_change_callback: Optional[Callable[[str], None]] = ear_change_callback
+        self._freq_change_callback: Optional[Callable[[int], None]] = freq_change_callback
         
         # Stop event for graceful test termination
         self.stop_event = threading.Event()
@@ -180,6 +182,7 @@ class AscendingMethod:
         2. Waits for user confirmation click
         3. Uses large steps to refine approximate threshold
         """
+        print("DEBUG: Starting Familiarization...")
         logging.info("Begin Familiarization")
         
         print(f"\n{'='*60}")
@@ -190,11 +193,13 @@ class AscendingMethod:
 
         # Find initial audibility threshold using audibletone()
         # This returns the level where patient first responds
+        print(f"DEBUG: Calling audibletone() with freq={self.freq}, level={self.ctrl.config.beginning_fam_level}, earside={self.earside}")
         self.current_level = self.ctrl.audibletone(
                              self.freq,
                              self.ctrl.config.beginning_fam_level,
                              self.earside,
                              stop_event=self.stop_event)
+        print(f"DEBUG: audibletone() returned level: {self.current_level} dBHL")
         
         # Check stop event after audibletone
         if self.stop_event.is_set():
@@ -203,18 +208,24 @@ class AscendingMethod:
 
         print(f"\nInitial threshold found at {self.current_level} dBHL")
         print("To begin the hearing test, click once")
+        print("DEBUG: Waiting for user response (wait_for_click_down_and_up)...")
         
         # Wait for click with timeout and stop_event checking
         # Use a timeout so we can check stop_event periodically
         if not self.stop_event.is_set():
             clicked = self.ctrl._rpd.wait_for_click_down_and_up(timeout=30.0)
+            print(f"DEBUG: wait_for_click_down_and_up returned: {clicked}")
             if not clicked and self.stop_event.is_set():
+                print("DEBUG: Timeout or stop requested, stopping audio")
                 self.ctrl.stop_audio_immediately()
                 return
             # Also check stop_event even if clicked
             if self.stop_event.is_set():
+                print("DEBUG: Stop event set after click, stopping audio")
                 self.ctrl.stop_audio_immediately()
                 return
+        else:
+            print("DEBUG: Stop event already set, skipping wait for click")
 
         # Large steps to refine approximate threshold
         # Decrement (go quieter) if patient still responds
@@ -501,18 +512,23 @@ class AscendingMethod:
             - Responder cleared before each test
             - Audio stopped between tests
         """
+        print("DEBUG: Entering AscendingMethod.run()")
         if not self.ctrl.config.logging:
             logging.disable(logging.CRITICAL)
         
         # Calculate total steps: (Number of Frequencies) * (Number of Ears)
         ears = list(self.ctrl.config.earsides)
         freqs = list(self.ctrl.config.freqs)
+        logging.info(f"DEBUG: Test Sequence Ears: {ears}")
+        print(f"DEBUG: Ears: {ears}, Freqs: {freqs}")
         self._total_steps = len(ears) * len(freqs) if ears and freqs else 0
         self._completed_steps = 0
         
         if self._total_steps == 0:
             logging.warning("No frequencies or earsides configured. Cannot run test.")
+            print("DEBUG: ERROR - No frequencies or earsides configured. Cannot run test.")
             return
+        print(f"DEBUG: Total steps: {self._total_steps}")
         
         logging.info(f"\n{'='*70}")
         logging.info("HEARING TEST STARTING")
@@ -527,7 +543,15 @@ class AscendingMethod:
 
         # Test each ear (order randomized in __init__)
         for ear_idx, self.earside in enumerate(ears):
-            # Check for stop request
+            # CRITICAL: Notify UI of ear change IMMEDIATELY as first line of loop
+            self._current_earside = self.earside
+            if self._ear_change_callback:
+                try:
+                    self._ear_change_callback(self.earside)
+                except Exception as e:
+                    logging.warning(f"Error calling ear change callback: {e}")
+            
+            # Check for stop request (after callback to ensure UI is updated)
             if self.stop_event.is_set():
                 logging.info("Test stop requested by user")
                 # Stop audio and clean up
@@ -537,15 +561,6 @@ class AscendingMethod:
                 except Exception:
                     pass
                 return
-            
-            self._current_earside = self.earside
-            
-            # Notify UI of ear change (Task 3)
-            if self._ear_change_callback:
-                try:
-                    self._ear_change_callback(self.earside)
-                except Exception as e:
-                    logging.warning(f"Error calling ear change callback: {e}")
             
             # Complete state reset when switching ears
             if ear_idx > 0:
@@ -586,6 +601,14 @@ class AscendingMethod:
                     return
                 
                 self._current_freq = self.freq
+                
+                # Notify UI of frequency change immediately
+                if self._freq_change_callback:
+                    try:
+                        self._freq_change_callback(self.freq)
+                    except Exception as e:
+                        logging.warning(f"Error calling frequency change callback: {e}")
+                
                 logging.info(f"\n{'-'*70}")
                 logging.info(f"Frequency: {self.freq} Hz | Ear: {self.earside.upper()}")
                 logging.info(f"{'-'*70}")
@@ -598,9 +621,9 @@ class AscendingMethod:
                     # Run the hearing test for this frequency/ear combination
                     self.hearing_test()
                     
-                    # Check stop event immediately after hearing_test() to prevent saving junk data
+                    # CRITICAL FIX: Check if we stopped during the test
                     if self.stop_event.is_set():
-                        logging.info("Test stop requested after hearing_test(). Skipping save.")
+                        logging.info("Test stopped. Aborting save for this frequency.")
                         return
                     
                     # Verify we have a valid threshold

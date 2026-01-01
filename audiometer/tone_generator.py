@@ -62,14 +62,22 @@ class AudioStream:
         self._callback_parameters = target_gain, slope, freq
         self._target_gain = target_gain
         self._callback_status = sd.CallbackFlags()
+        
+        # Stereo Masking Matrix: Pre-calculated channel mask for channel isolation
+        # Will be set in start() based on earside parameter
+        # Initialize to zero (no output) until start() is called
+        # Left Ear: [1.0, 0.0] -> signal only in left channel
+        # Right Ear: [0.0, 1.0] -> signal only in right channel
+        self.channel_mask = np.array([0.0, 0.0])  # Initialize to zero, will be set in start()
+        
         self._stream.start()
 
     def _callback(self, outdata, frames, time, status):
-        """Callback function for audio output with strict channel isolation.
+        """Callback function for audio output with Stereo Masking Matrix isolation.
         
-        CRITICAL: This function ensures that audio is written ONLY to the
-        target channel (left=0 or right=1) and the other channel is
-        explicitly set to zero (silence) to prevent audio leakage.
+        CRITICAL: This function uses a mathematically robust Stereo Masking Matrix
+        approach to ensure audio is written ONLY to the target channel. The mono
+        signal is multiplied by the channel_mask to create true stereo separation.
         """
         assert frames > 0
         self._callback_status |= status
@@ -77,7 +85,7 @@ class AudioStream:
         # Get current tone parameters (thread-safe)
         target_gain, slope, freq = self._callback_parameters
         
-        # Generate tone signal
+        # Generate mono tone signal (1D array)
         k = np.arange(self._index, self._index + frames)
         ramp = np.arange(frames) * slope + self._last_gain + slope
         assert slope != 0 or (target_gain == 0 and self._last_gain == 0)
@@ -87,40 +95,45 @@ class AudioStream:
         else:
             gain = np.maximum(target_gain, ramp)
         
-        signal = gain * np.sin(2 * np.pi * freq * k / samplerate)
+        # Generate raw mono signal (1D array)
+        mono_signal = gain * np.sin(2 * np.pi * freq * k / samplerate)
         
-        # CRITICAL: Strict stereo separation
-        # Get number of channels in output buffer
+        # CRITICAL: Stereo Masking Matrix approach
+        # Validate output buffer has 2 channels (stereo)
         nch = outdata.shape[1]
         
-        # Zero out ALL channels first to ensure clean state
-        outdata.fill(0)
-        
-        # Write signal ONLY to the target channel (left=0 or right=1)
-        if nch >= 2:
-            # Stereo output: write to target channel only
-            if self._channel == 0:
-                # Left ear: write to channel 0, channel 1 stays zero
-                outdata[:, 0] = signal
-                # Explicitly ensure channel 1 is zero (already done by fill(0), but be explicit)
-                outdata[:, 1] = 0
-            elif self._channel == 1:
-                # Right ear: write to channel 1, channel 0 stays zero
-                outdata[:, 0] = 0  # Explicitly zero left channel
-                outdata[:, 1] = signal
-            else:
-                # Invalid channel - zero everything
-                outdata.fill(0)
-                logging.error(f"Invalid channel {self._channel}. Expected 0 (left) or 1 (right).")
+        if nch == 2:
+            # Stereo output: Use channel_mask to create true stereo separation
+            # Ensure mono_signal is column vector (N, 1) for proper broadcasting
+            # mono_signal[:, np.newaxis] creates shape (frames, 1)
+            # self.channel_mask has shape (2,)
+            # Broadcasting: (frames, 1) * (2,) -> (frames, 2)
+            stereo_signal = mono_signal[:, np.newaxis] * self.channel_mask
+            outdata[:] = stereo_signal
+            
+            # Debug: Check if sound is actually being generated (first ~1 second only)
+            # Print every ~0.1 seconds (4410 samples) to avoid flooding console
+            if self._index < samplerate:  # First second only
+                max_amp = np.max(np.abs(outdata))
+                # Print at intervals of ~0.1 seconds (4410 samples at 44.1kHz)
+                print_interval = samplerate // 10  # 4410 samples
+                if print_interval > 0:
+                    # Check if we've crossed a print interval boundary
+                    prev_index = self._index - frames
+                    if (prev_index // print_interval) < (self._index // print_interval):
+                        print(f"DEBUG: Callback active. Frame {self._index}, Max amp: {max_amp:.6f}, "
+                              f"freq={freq:.1f}, channel_mask={self.channel_mask}")
         elif nch == 1:
-            # Mono fallback: write to single channel
-            # This should not happen if device reports stereo support, but handle gracefully
-            logging.warning("Mono output detected - strict stereo separation not possible")
-            outdata[:, 0] = signal
+            # Mono device fallback (should not happen, but handle gracefully)
+            logging.warning("Mono output detected (device reports 1 channel) - "
+                          "strict stereo separation not possible. Playing to single channel.")
+            print("DEBUG: WARNING - Mono output detected, playing to single channel")
+            outdata[:, 0] = mono_signal
         else:
-            # No channels? Zero everything
+            # Invalid channel count
             outdata.fill(0)
-            logging.error(f"Invalid number of channels: {nch}")
+            logging.error(f"Invalid number of channels: {nch}. Expected 2 (stereo).")
+            print(f"DEBUG: ERROR - Invalid number of channels: {nch}. Expected 2 (stereo).")
         
         self._index += frames
         self._last_gain = gain[-1]
@@ -145,13 +158,19 @@ class AudioStream:
         self._freq = freq
         self._callback_parameters = target_gain, slope, freq
         
-        # Set target channel based on earside
+        # Set target channel and channel_mask based on earside (Stereo Masking Matrix)
         if earside == 'left':
             self._channel = 0  # Left channel
+            self.channel_mask = np.array([1.0, 0.0], dtype=np.float32)  # Signal only in left channel
+            print(f"DEBUG: AudioStream.start() - Left ear, channel_mask={self.channel_mask}")
         elif earside == 'right':
             self._channel = 1  # Right channel
+            self.channel_mask = np.array([0.0, 1.0], dtype=np.float32)  # Signal only in right channel
+            print(f"DEBUG: AudioStream.start() - Right ear, channel_mask={self.channel_mask}")
         else:
             raise ValueError(f"earside must be 'left' or 'right', got '{earside}'")
+        
+        print(f"DEBUG: AudioStream.start() - freq={freq} Hz, gain_db={gain_db:.2f} dB, target_gain={target_gain:.6f}")
 
     def stop(self):
         """Stop playing the tone with release envelope."""

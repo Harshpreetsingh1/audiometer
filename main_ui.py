@@ -409,7 +409,7 @@ class AudiometerUI(ttk.Window):
             device_id = int(device_str.split(':')[0])
         except (ValueError, IndexError):
             self._show_error("Invalid device selection! Please select a valid audio device.")
-        return
+            return
 
         # Check device channel capability (warn if mono only)
         try:
@@ -473,7 +473,7 @@ class AudiometerUI(ttk.Window):
             # Launch test in separate thread (CRITICAL: prevents UI freezing)
             self.test_thread = threading.Thread(
                 target=self._run_test_thread,
-                args=(device_id, full_name, self._update_progress_bar, self._on_ear_change),
+                args=(device_id, full_name, self._update_progress_bar, self._on_ear_change, self._on_freq_change),
                 daemon=True,  # Thread dies when main program exits
                 name="AudiometerTestThread"
             )
@@ -502,7 +502,7 @@ class AudiometerUI(ttk.Window):
             self.status_label.config(text="Ready to start test", bootstyle="primary")
             self.is_running = False
     
-    def _run_test_thread(self, device_id, subject_name, progress_callback, ear_change_callback):
+    def _run_test_thread(self, device_id, subject_name, progress_callback, ear_change_callback, freq_change_callback):
         """Run the hearing test in background thread.
         
         Args:
@@ -510,47 +510,61 @@ class AudiometerUI(ttk.Window):
             subject_name: Patient name
             progress_callback: Callback function for progress updates (receives float 0-100)
             ear_change_callback: Callback function for ear changes (receives 'left' or 'right')
+            freq_change_callback: Callback function for frequency changes (receives frequency in Hz)
         """
+        print("DEBUG: Thread started with device_id:", device_id)
         try:
             # CRITICAL FIX: Check stop flag BEFORE creating test instance (race condition prevention)
             if self.test_stop_requested:
                 logging.info("Test stop requested before test creation. Aborting.")
+                print("DEBUG: Test stop requested before test creation. Aborting.")
                 self.after(0, self._on_test_stopped)
                 return
             
             # Reset stop flag
             self.test_stop_requested = False
+            print("DEBUG: Creating AscendingMethod instance...")
             
-            # Create test instance with progress callback and ear change callback (Task 2 & 3)
+            # Create test instance with progress callback, ear change callback, and frequency change callback
             test = AscendingMethod(
                 device_id=device_id,
                 subject_name=subject_name,
                 progress_callback=progress_callback,
-                ear_change_callback=ear_change_callback
+                ear_change_callback=ear_change_callback,
+                freq_change_callback=freq_change_callback
             )
+            print("DEBUG: AscendingMethod instance created successfully")
             
             # CRITICAL FIX: Check stop flag AGAIN after creation (race condition window)
             if self.test_stop_requested:
                 logging.info("Test stop requested immediately after test creation. Stopping.")
+                print("DEBUG: Test stop requested immediately after test creation. Stopping.")
                 test.stop_test()
                 self.after(0, self._on_test_stopped)
                 return
             
             with self.test_lock:
                 self.current_test = test
+            print("DEBUG: Test instance stored in current_test, calling test.run()...")
             
             # Run test
             test.run()
+            print("DEBUG: test.run() completed")
             
             # Check if stop was requested
             if self.test_stop_requested or test.stop_event.is_set():
+                print("DEBUG: Test stopped by user")
                 self.after(0, self._on_test_stopped)
             else:
                 # Test completed successfully
+                print("DEBUG: Test completed successfully")
                 self.is_running = False
                 self.after(0, self._on_test_completed, test)
             
         except Exception as e:
+            print("DEBUG: EXCEPTION in _run_test_thread:", str(e))
+            import traceback
+            traceback.print_exc()  # CRITICAL: Print full traceback to console
             self.is_running = False
             if not self.test_stop_requested:
                 self.after(0, self._on_test_error, str(e))
@@ -647,16 +661,46 @@ class AudiometerUI(ttk.Window):
         """
         self.after(0, lambda: self._on_ear_change_safe(ear_name))
     
-    def _on_ear_change_safe(self, ear_name):
-        """Thread-safe ear indicator update (Task 3)."""
+    def _on_freq_change(self, freq):
+        """Handle frequency change callback.
+        
+        Called from test thread when frequency changes. Updates UI thread-safely.
+        
+        Args:
+            freq: Frequency in Hz
+        """
+        self.after(0, lambda: self._on_freq_change_safe(freq))
+    
+    def _on_freq_change_safe(self, freq):
+        """Thread-safe frequency indicator update."""
         try:
-            ear_display = ear_name.upper() + " EAR"
-            self.ear_indicator_label.config(
-                text=f"Testing: {ear_display}",
-                bootstyle="warning"
+            self.status_label.config(
+                text=f"Current Frequency: {freq} Hz",
+                bootstyle="info"
             )
-            # Logging is optional - remove if not needed
-            # logging.info(f"Ear changed to: {ear_name}")
+        except Exception as e:
+            print(f"Error updating frequency indicator: {e}")
+    
+    def _on_ear_change_safe(self, ear_name):
+        """Thread-safe ear indicator update with clinical standard colors."""
+        try:
+            # Format: "TESTING: LEFT EAR" or "TESTING: RIGHT EAR"
+            ear_display = ear_name.upper() + " EAR"
+            
+            # Clinical standard: BLUE for Left Ear, RED for Right Ear
+            if ear_name.lower() == 'left':
+                bootstyle = 'info'  # Blue style
+            elif ear_name.lower() == 'right':
+                bootstyle = 'danger'  # Red style
+            else:
+                bootstyle = 'secondary'
+            
+            # Update with clear text and color coding
+            self.ear_indicator_label.config(
+                text=f"TESTING: {ear_display}",
+                font=("Helvetica", 24, "bold"),
+                bootstyle=bootstyle
+            )
         except Exception as e:
             print(f"Error updating ear indicator: {e}")
     
@@ -726,30 +770,10 @@ class AudiometerUI(ttk.Window):
             print(f"Error updating progress bar: {e}")
     
     def _poll_ui_updates(self):
-        """Poll for status updates (progress is now handled by callback)."""
+        """Poll for UI state updates (status is now event-driven via callbacks)."""
         if self.is_running and self.current_test:
             try:
-                with self.test_lock:
-                    if self.current_test:
-                        # Update status with current test info
-                        if hasattr(self.current_test, '_current_earside') and hasattr(self.current_test, '_current_freq'):
-                            ear = self.current_test._current_earside or "Unknown"
-                            freq = self.current_test._current_freq or "Unknown"
-                            if ear != "Unknown" and freq != "Unknown":
-                                self.status_label.config(
-                                    text=f"Testing {ear.upper()} Ear - {freq}Hz",
-                                    bootstyle="info"
-                                )
-                        elif hasattr(self.current_test, 'earside') and hasattr(self.current_test, 'freq'):
-                            # Fallback to direct attributes
-                            ear = getattr(self.current_test, 'earside', 'Unknown')
-                            freq = getattr(self.current_test, 'freq', 'Unknown')
-                            if ear and freq:
-                                self.status_label.config(
-                                    text=f"Testing {ear.upper()} Ear - {freq}Hz",
-                                    bootstyle="info"
-                                )
-                
+                # Only update button state, NOT status text (event-driven now)
                 # Enable patient button during test
                 if self.patient_button.cget("state") == DISABLED and self.is_running:
                     self.patient_button.config(state=NORMAL)
