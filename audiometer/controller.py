@@ -55,6 +55,8 @@ def config(args=None):
     parser.add_argument("--start-level-familiar", type=float, default=-40)
     parser.add_argument("--freqs", type=float, nargs='+', default=[1000, 2000, 4000, 500],
                         help='Frequencies to test. Default is a quick-screen set: [1000, 2000, 4000, 500]')
+    parser.add_argument("--quick-mode", action='store_true', default=False, help='Run in quick screening mode (4 freqs).')
+    parser.add_argument("--mini-mode", action='store_true', default=False, help='Run in ultra quick mode (2 freqs).')
     parser.add_argument("--conduction", type=str, default='air', help="How "
                         "do you connect the headphones to the head? Choose "
                         " air or bone.")
@@ -89,6 +91,13 @@ def config(args=None):
     # empty list), that list will be used instead.
     parsed_args = parser.parse_args(args)
 
+    # If mini-mode is requested, it takes precedence over quick-mode
+    if getattr(parsed_args, 'mini_mode', False):
+        parsed_args.freqs = [1000, 4000]
+    # If quick-mode flag is set (or not using args), allow callers to request the quick set
+    elif getattr(parsed_args, 'quick_mode', False):
+        parsed_args.freqs = [1000, 2000, 4000, 500]
+
     if not os.path.exists(parsed_args.results_path):
         os.makedirs(parsed_args.results_path)
 
@@ -97,9 +106,18 @@ def config(args=None):
 
 class Controller:
 
-    def __init__(self, device_id=None, subject_name=None):
+    def __init__(self, device_id=None, subject_name=None, quick_mode: bool = False, mini_mode: bool = False):
 
-        self.config = config(args=[])
+        # Allow callers (such as the UI) to request quick-screening mode when
+        # instantiating a Controller programmatically. When quick_mode is True,
+        # pass the corresponding flag to argparse so the parsed config uses the
+        # quick screening frequency set.
+        if mini_mode:
+            self.config = config(args=['--mini-mode'])
+        elif quick_mode:
+            self.config = config(args=['--quick-mode'])
+        else:
+            self.config = config(args=[])
         
         # Override the default device if one was passed from the UI
         if device_id is not None:

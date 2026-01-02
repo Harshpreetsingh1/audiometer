@@ -44,7 +44,7 @@ class AscendingMethod:
         - State is completely isolated between ears
     """
     
-    def __init__(self, device_id=None, subject_name=None, progress_callback=None, ear_change_callback=None, freq_change_callback=None):
+    def __init__(self, device_id=None, subject_name=None, progress_callback=None, ear_change_callback=None, freq_change_callback=None, quick_mode: bool = False, mini_mode: bool = False):
         """Initialize the ascending method test.
         
         Args:
@@ -54,7 +54,10 @@ class AscendingMethod:
             ear_change_callback: Optional callback function called when ear changes (receives ear name: 'left' or 'right').
             freq_change_callback: Optional callback function called when frequency changes (receives frequency in Hz).
         """
-        self.ctrl = controller.Controller(device_id=device_id, subject_name=subject_name)
+        # Allow the caller to request quick-screening mode so the controller
+        # configuration uses the shorter frequency set when appropriate.
+        # Allow callers to request either quick or mini (2-freq) screening.
+        self.ctrl = controller.Controller(device_id=device_id, subject_name=subject_name, quick_mode=quick_mode, mini_mode=mini_mode)
         
         # Test state (reset for each frequency)
         self.current_level = 0
@@ -108,6 +111,8 @@ class AscendingMethod:
         while ensuring both ears are tested.
         """
         if len(self.ctrl.config.earsides) > 1:
+            # Fully shuffle the ear order so each test run may use any
+            # arbitrary ear sequence. This prevents predictability.
             earsides_list = list(self.ctrl.config.earsides)
             random.shuffle(earsides_list)
             self.ctrl.config.earsides = earsides_list
@@ -555,6 +560,7 @@ class AscendingMethod:
         logging.info(f"{'='*70}\n")
 
         # Randomize start ear so tests may start left or right but cover both
+        # Fully shuffle the ear order so start ear is randomized each run.
         if len(ears) > 1:
             random.shuffle(ears)
 

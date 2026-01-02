@@ -47,6 +47,8 @@ class AudiometerUI(ttk.Window):
         self.test_lock = threading.Lock()
         self.last_progress = 0
         self.button_flash_active = False
+        # Flag indicating whether the Tk mainloop is active (set by main())
+        self._mainloop_running = False
         
         # Register cleanup handlers for graceful shutdown
         self._register_cleanup_handlers()
@@ -241,7 +243,28 @@ class AudiometerUI(ttk.Window):
             command=self._on_high_contrast_toggle
         )
         high_contrast_check.pack(anchor=W, pady=(0, 10))
-        
+
+        # Quick vs Diagnostic mode toggle
+        self.quick_mode_var = ttk.BooleanVar(value=_PREFERENCES.get('quick_mode', True))
+        quick_mode_check = ttk.Checkbutton(
+            config_frame,
+            text="Quick Screening Mode (4 freqs)",
+            variable=self.quick_mode_var,
+            bootstyle="secondary-round-toggle",
+            command=self._on_quick_mode_toggle
+        )
+        quick_mode_check.pack(anchor=W, pady=(0, 10))
+
+        # Ultra Quick Mode: 2 frequencies per test (highest speed)
+        self.mini_mode_var = ttk.BooleanVar(value=_PREFERENCES.get('mini_mode', False))
+        mini_mode_check = ttk.Checkbutton(
+            config_frame,
+            text="Ultra Quick Mode (2 freqs)",
+            variable=self.mini_mode_var,
+            bootstyle="warning-round-toggle",
+            command=self._on_mini_mode_toggle
+        )
+        mini_mode_check.pack(anchor=W, pady=(0, 10))
         # Action Button
         self.start_button = ttk.Button(
             self.sidebar_frame,
@@ -523,10 +546,15 @@ class AudiometerUI(ttk.Window):
             self.test_stop_requested = False
             self.last_progress = 0
             
+            # Capture UI preferences on the main thread to avoid cross-thread
+            # access to Tkinter variables (which causes RuntimeError).
+            quick_mode_flag = bool(self.quick_mode_var.get())
+            mini_mode_flag = bool(self.mini_mode_var.get())
+
             # Launch test in separate thread (CRITICAL: prevents UI freezing)
             self.test_thread = threading.Thread(
                 target=self._run_test_thread,
-                args=(device_id, full_name, self._update_progress_bar, self._on_ear_change, self._on_freq_change),
+                args=(device_id, full_name, self._update_progress_bar, self._on_ear_change, self._on_freq_change, quick_mode_flag, mini_mode_flag),
                 daemon=True,  # Thread dies when main program exits
                 name="AudiometerTestThread"
             )
@@ -555,15 +583,17 @@ class AudiometerUI(ttk.Window):
             self.status_label.config(text="Ready to start test", bootstyle="primary")
             self.is_running = False
     
-    def _run_test_thread(self, device_id, subject_name, progress_callback, ear_change_callback, freq_change_callback):
+    def _run_test_thread(self, device_id, subject_name, progress_callback, ear_change_callback, freq_change_callback, quick_mode_flag=False, mini_mode_flag=False):
         """Run the hearing test in background thread.
-        
+
         Args:
             device_id: Audio device ID
             subject_name: Patient name
             progress_callback: Callback function for progress updates (receives float 0-100)
             ear_change_callback: Callback function for ear changes (receives 'left' or 'right')
             freq_change_callback: Callback function for frequency changes (receives frequency in Hz)
+            quick_mode_flag: Boolean passed from UI main thread indicating quick mode
+            mini_mode_flag: Boolean passed from UI main thread indicating mini mode (ultra-quick)
         """
         print("DEBUG: Thread started with device_id:", device_id)
         try:
@@ -579,12 +609,15 @@ class AudiometerUI(ttk.Window):
             print("DEBUG: Creating AscendingMethod instance...")
             
             # Create test instance with progress callback, ear change callback, and frequency change callback
+            # Use flags captured from the main/UI thread to avoid cross-thread Tk calls
             test = AscendingMethod(
                 device_id=device_id,
                 subject_name=subject_name,
                 progress_callback=progress_callback,
                 ear_change_callback=ear_change_callback,
-                freq_change_callback=freq_change_callback
+                freq_change_callback=freq_change_callback,
+                quick_mode=bool(quick_mode_flag),
+                mini_mode=bool(mini_mode_flag)
             )
             print("DEBUG: AscendingMethod instance created successfully")
             
@@ -607,6 +640,8 @@ class AudiometerUI(ttk.Window):
             # Check if stop was requested
             if self.test_stop_requested or test.stop_event.is_set():
                 print("DEBUG: Test stopped by user")
+                # Ensure running flag is cleared so UI knows test has stopped
+                self.is_running = False
                 self.after(0, self._on_test_stopped)
             else:
                 # Test completed successfully
@@ -650,67 +685,107 @@ class AudiometerUI(ttk.Window):
             # The UI will be reset when _on_test_completed or _on_test_stopped is called
             # But we can disable the stop button to prevent double-clicks
             self.stop_button.config(state=DISABLED)
+
+            # Attempt to wait briefly for the background test thread to terminate so
+            # the UI can be reset immediately and a restart can proceed without race.
+            try:
+                if self.test_thread and self.test_thread.is_alive():
+                    # Join for a short time only to avoid blocking the UI too long
+                    self.test_thread.join(timeout=0.5)
+                # If the thread finished, ensure we reset UI state synchronously
+                if not self.test_thread or not self.test_thread.is_alive():
+                    try:
+                        self._on_test_stopped()
+                    except Exception:
+                        pass
+            except Exception as e:
+                logging.debug(f"Error while waiting for test thread to stop: {e}")
     
     def _on_test_stopped(self):
         """Handle test stop."""
-        self._set_test_controls_state(NORMAL)
-        self.start_button.config(state=NORMAL)
-        self.stop_button.config(state=DISABLED)
-        self.patient_button.config(state=DISABLED, bootstyle="primary")
-        # Ensure window is no longer forced topmost
         try:
-            self.attributes('-topmost', False)
-        except Exception:
-            pass
-        # Return focus to Start button for quick restart
-        try:
-            self.start_button.focus_set()
-        except Exception:
-            pass
-        
-        self.status_label.config(text="Test Stopped", bootstyle="warning")
-        self.ear_indicator_label.config(text="", bootstyle="warning")
-        self.test_stop_requested = False
-        
-        # Clean up test reference
-        with self.test_lock:
-            self.current_test = None
+            self._set_test_controls_state(NORMAL)
+            self.start_button.config(state=NORMAL)
+            self.stop_button.config(state=DISABLED)
+            self.patient_button.config(state=DISABLED, bootstyle="primary")
+            # Ensure window is no longer forced topmost
+            try:
+                self.attributes('-topmost', False)
+            except Exception:
+                pass
+            # Return focus to Start button for quick restart
+            try:
+                self.start_button.focus_set()
+            except Exception:
+                pass
+
+            self.status_label.config(text="Test Stopped", bootstyle="warning")
+            self.ear_indicator_label.config(text="", bootstyle="warning")
+            # Ensure running flag is cleared
+            self.is_running = False
+            self.test_stop_requested = False
+
+            # Clean up test reference
+            with self.test_lock:
+                self.current_test = None
+        except Exception as e:
+            logging.debug(f"_on_test_stopped UI update skipped due to error: {e}")
+            # Ensure we clear running state and restore Start button where possible
+            try:
+                self.is_running = False
+                self.test_stop_requested = False
+                self.start_button.config(state=NORMAL)
+                self.stop_button.config(state=DISABLED)
+            except Exception:
+                pass
+            try:
+                with self.test_lock:
+                    self.current_test = None
+            except Exception:
+                pass
     
     def _on_test_completed(self, test):
         """Handle test completion."""
-        self._set_test_controls_state(NORMAL)
-        self.start_button.config(state=NORMAL)
-        self.stop_button.config(state=DISABLED)
-        self.patient_button.config(state=DISABLED, bootstyle="primary")
-        # Ensure window is no longer forced topmost
         try:
-            self.attributes('-topmost', False)
-        except Exception:
-            pass
-        try:
-            self.start_button.focus_set()
-        except Exception:
-            pass
-        
-        self.status_label.config(text="Test Completed!", bootstyle="success")
-        self.ear_indicator_label.config(text="", bootstyle="warning")
-        self.progress_var.set(100)
-        self.progress_text.config(text="100%")
-        
-        # Open audiogram automatically
-        try:
-            csv_path = os.path.join(test.ctrl.config.results_path, test.ctrl.config.filename)
-            pdf_path = csv_path + '.pdf'
-            if os.path.exists(pdf_path):
-                self._open_file(pdf_path)
+            self._set_test_controls_state(NORMAL)
+            self.start_button.config(state=NORMAL)
+            self.stop_button.config(state=DISABLED)
+            self.patient_button.config(state=DISABLED, bootstyle="primary")
+            # Ensure window is no longer forced topmost
+            try:
+                self.attributes('-topmost', False)
+            except Exception:
+                pass
+            try:
+                self.start_button.focus_set()
+            except Exception:
+                pass
+
+            self.status_label.config(text="Test Completed!", bootstyle="success")
+            self.ear_indicator_label.config(text="", bootstyle="warning")
+            self.progress_var.set(100)
+            self.progress_text.config(text="100%")
+
+            # Open audiogram automatically
+            try:
+                csv_path = os.path.join(test.ctrl.config.results_path, test.ctrl.config.filename)
+                pdf_path = csv_path + '.pdf'
+                if os.path.exists(pdf_path):
+                    self._open_file(pdf_path)
+            except Exception as e:
+                print(f"Could not open audiogram: {e}")
+
+            # Show completion message
+            self._show_info(
+                "Hearing test completed!\n\n"
+                f"Results saved to:\n{test.ctrl.config.results_path}"
+            )
         except Exception as e:
-            print(f"Could not open audiogram: {e}")
-        
-        # Show completion message
-        self._show_info(
-            "Hearing test completed!\n\n"
-            f"Results saved to:\n{test.ctrl.config.results_path}"
-        )
+            logging.debug(f"_on_test_completed UI update skipped due to error: {e}")
+            try:
+                self.progress_var.set(100)
+            except Exception:
+                pass
     
     def _on_test_error(self, error_msg):
         """Handle test error."""
@@ -939,12 +1014,21 @@ class AudiometerUI(ttk.Window):
 
             # Remove topmost after a short delay so user can interact with other apps later
             try:
-                self.after(300, lambda: self.attributes('-topmost', False))
+                # Only schedule delayed UI tasks when the mainloop is running to avoid
+                # Tcl callbacks being invoked in test/headless environments.
+                if getattr(self, '_mainloop_running', False):
+                    self.after(300, self._safe_clear_topmost)
             except Exception:
                 pass
-
         except Exception as e:
             logging.debug(f"_ensure_windows_focus() error: {e}")
+
+    def _safe_clear_topmost(self):
+        """Safely clear the topmost attribute; tolerates headless/test environments."""
+        try:
+            self.attributes('-topmost', False)
+        except Exception:
+            pass
 
     def _on_dark_theme_toggle(self):
         """Apply dark or light theme at runtime when user toggles the checkbox."""
@@ -965,13 +1049,85 @@ class AudiometerUI(ttk.Window):
                 logging.debug(f"Could not switch theme at runtime: {e}")
         except Exception as e:
             logging.debug(f"_on_dark_theme_toggle error: {e}")
+        # Persist preference
+        try:
+            self._save_ui_prefs()
+        except Exception as e:
+            logging.debug(f"Could not save prefs after theme toggle: {e}")
+
+    def _on_win_focus_toggle(self):
+        # Persist the changed value
+        try:
+            self._save_ui_prefs()
+        except Exception as e:
+            logging.debug(f"Could not save prefs after win_focus toggle: {e}")
+
+    def _on_high_contrast_toggle(self):
+        # Apply high contrast option (e.g., increase fonts)
+        try:
+            if self.high_contrast_var.get():
+                # Increase some element fonts for accessibility
+                self.status_label.config(font=("Helvetica", 18, "bold"))
+                self.feedback_label.config(font=("Helvetica", 14))
+            else:
+                self.status_label.config(font=("Helvetica", 16, "bold"))
+                self.feedback_label.config(font=("Helvetica", 12))
+        except Exception as e:
+            logging.debug(f"Could not apply high contrast: {e}")
+        # Persist preference
+        try:
+            self._save_ui_prefs()
+        except Exception as e:
+            logging.debug(f"Could not save prefs after high_contrast toggle: {e}")
+
+    def _save_ui_prefs(self):
+        """Collect UI preference values and persist them to config file."""
+        try:
+            prefs = {
+                'theme': 'darkly' if self.dark_theme_var.get() else ('litera' if sys.platform == 'win32' else 'superhero'),
+                'win_focus': bool(self.win_focus_var.get()),
+                'high_contrast': bool(self.high_contrast_var.get())
+            }
+            save_prefs(prefs)
+        except Exception as e:
+            logging.debug(f"Error saving UI prefs: {e}")
+
+    def _on_quick_mode_toggle(self):
+        try:
+            # If quick mode is enabled, ensure mini mode is disabled to avoid
+            # conflicting shortcuts. The UI persists both values but mini-mode
+            # takes precedence during test creation.
+            prefs = {'quick_mode': bool(self.quick_mode_var.get()), 'mini_mode': False}
+            # Load existing prefs first to avoid overwriting other keys
+            full = _PREFERENCES.copy()
+            full.update(prefs)
+            save_prefs(full)
+        except Exception as e:
+            logging.debug(f"Error saving quick mode pref: {e}")
+
+    def _on_mini_mode_toggle(self):
+        try:
+            prefs = {'mini_mode': bool(self.mini_mode_var.get())}
+            # If mini-mode is enabled, disable quick-mode to avoid ambiguity
+            if prefs['mini_mode']:
+                prefs['quick_mode'] = False
+            full = _PREFERENCES.copy()
+            full.update(prefs)
+            save_prefs(full)
+        except Exception as e:
+            logging.debug(f"Error saving mini mode pref: {e}")
 
 
 def main():
     """Main entry point."""
     try:
         app = AudiometerUI()
-        app.mainloop()
+        # Mark that mainloop will be active so delayed UI tasks are scheduled
+        app._mainloop_running = True
+        try:
+            app.mainloop()
+        finally:
+            app._mainloop_running = False
     except Exception as e:
         print(f"Fatal error: {e}")
         import traceback
