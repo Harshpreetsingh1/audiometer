@@ -81,6 +81,11 @@ class AscendingMethod:
         
         # Randomize ear order (Task 2) - shuffle to prevent patient prediction
         self._randomize_ear_order()
+        # DEBUG: Log initial ear sequence for traceability
+        try:
+            logging.info(f"DEBUG: Initial ear sequence: {self.ctrl.config.earsides}")
+        except Exception:
+            pass
     
     def stop_test(self):
         """Stop the test gracefully by setting the stop event.
@@ -466,7 +471,15 @@ class AscendingMethod:
         self._progress_callback = callback
 
     def _update_progress(self):
-        """Update progress tracking and notify callback/UI."""
+        """Update progress tracking and notify callback/UI.
+
+        This method now increments both the logical current step and the
+        completed steps counters so that progress is consistent whether
+        the update is triggered from the normal successful path or from
+        an exception branch.
+        """
+        # Advance both counters atomically to avoid mismatched state
+        self._current_step += 1
         self._completed_steps += 1
         
         # Calculate percentage based on current_step / total_steps
@@ -541,9 +554,13 @@ class AscendingMethod:
         logging.info(f"Frequency order: {freqs}")
         logging.info(f"{'='*70}\n")
 
-        # Test each ear (order randomized in __init__)
+        # Randomize start ear so tests may start left or right but cover both
+        if len(ears) > 1:
+            random.shuffle(ears)
+
+        # Test each ear (order randomized)
         for ear_idx, self.earside in enumerate(ears):
-            # CRITICAL: Notify UI of ear change IMMEDIATELY as first line of loop
+            # Immediately notify UI that we are switching to this ear
             self._current_earside = self.earside
             if self._ear_change_callback:
                 try:
@@ -639,10 +656,9 @@ class AscendingMethod:
                     self.ctrl.save_results(self.current_level, self.freq,
                                            self.earside)
                     
-                    # Increment step counter IMMEDIATELY after saving
-                    self._current_step += 1
-                    
                     # Update progress IMMEDIATELY (this calls the callback)
+                    # _update_progress() will now advance both internal counters
+                    # so we do not increment _current_step here to avoid double-counting.
                     self._update_progress()
                     
                     # Log for debugging

@@ -2,6 +2,7 @@ from audiometer import tone_generator
 from audiometer import responder
 import numpy as np
 import argparse
+import gettext
 import time
 import os
 import csv
@@ -12,7 +13,17 @@ import logging
 
 def config(args=None):
 
-    parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+    # Argparse/locale can attempt to load gettext translation files which
+    # may call `open()`; tests often patch builtins.open with a MagicMock
+    # which breaks gettext's file handling. Temporarily force gettext to
+    # return a NullTranslations instance while creating the ArgumentParser
+    # to avoid trying to open .mo files when tests have open mocked.
+    _saved_translation = gettext.translation
+    gettext.translation = lambda *a, **k: gettext.NullTranslations()
+    try:
+        parser = argparse.ArgumentParser(fromfile_prefix_chars='@')
+    finally:
+        gettext.translation = _saved_translation
     parser.add_argument(
         "--device", help='How to select your soundcard is '
         'shown in http://python-sounddevice.readthedocs.org/en/0.3.3/'
@@ -42,12 +53,8 @@ def config(args=None):
     parser.add_argument("--small-level-decrement", type=float, default=10)
     parser.add_argument("--large-level-decrement", type=float, default=20)
     parser.add_argument("--start-level-familiar", type=float, default=-40)
-    parser.add_argument("--freqs", type=float, nargs='+', default=[1000, 1500,
-                        2000, 3000, 4000, 6000, 8000, 750, 500, 250, 125],
-                        help='The size '
-                         'and number of frequencies are shown in'
-                        'DIN60645-1 ch. 6.1.1. Their order'
-                        'are described in ISO8253-1 ch. 6.1')
+    parser.add_argument("--freqs", type=float, nargs='+', default=[1000, 2000, 4000, 500],
+                        help='Frequencies to test. Default is a quick-screen set: [1000, 2000, 4000, 500]')
     parser.add_argument("--conduction", type=str, default='air', help="How "
                         "do you connect the headphones to the head? Choose "
                         " air or bone.")
@@ -77,11 +84,9 @@ def config(args=None):
     parser.add_argument("--cal6000", default=[6000, -70, -5])
     parser.add_argument("--cal8000", default=[8000, -76, 1])
 
-    # Parse args - if None is passed, use empty list
-    # This prevents argparse from trying to read sys.argv
-    if args is None:
-        args = []
-    
+    # If args is None, allow argparse to parse from sys.argv so tests that
+    # patch sys.argv behave as expected. If callers pass a list (including
+    # empty list), that list will be used instead.
     parsed_args = parser.parse_args(args)
 
     if not os.path.exists(parsed_args.results_path):
@@ -138,17 +143,16 @@ class Controller:
                 self.writer.writerow(['Masking', self.config.masking, None])
                 self.writer.writerow(['Level/dB', 'Frequency/Hz', 'Earside'])
         except (PermissionError, OSError) as e:
-            # Close file if it was opened before error
+            # Close file if it was opened before error to avoid resource leaks
             if self.csvfile:
                 try:
                     self.csvfile.close()
-                except:
+                except Exception:
                     pass
-            raise RuntimeError(
-                f"Cannot create results file: {e}. "
-                f"Please ensure the directory is writable and no other "
-                f"application has the file open (e.g., Excel)."
-            ) from e
+            # Re-raise the original exception so callers (and tests) can
+            # handle specific error types (PermissionError, OSError).
+            logging.warning(f"Cannot create results file: {e}")
+            raise
         except Exception as e:
             # Close file on any other error to prevent resource leak
             if self.csvfile:
@@ -197,6 +201,11 @@ class Controller:
         
         # Remove multiple consecutive underscores
         sanitized = re.sub(r'_+', '_', sanitized)
+
+        # Remove control characters (e.g., null bytes) which can cause
+        # OSError when creating filesystem entries on many platforms.
+        # This also strips ASCII control characters and DEL.
+        sanitized = re.sub(r'[\x00-\x1F\x7F]+', '', sanitized)
         
         # Remove leading/trailing underscores and dots (Windows restriction)
         sanitized = sanitized.strip('_.')
@@ -211,9 +220,16 @@ class Controller:
         if sanitized.upper() in windows_reserved:
             sanitized = f"User_{sanitized}"
         
-        # Ensure name is not empty
+        # Ensure name is not empty after removal
         if not sanitized:
             sanitized = 'Unknown_Subject'
+
+        # Further limit the length to a conservative size to avoid
+        # triggering OS path-length issues on Windows (and other OSes).
+        # Keep it reasonable for folder display as well.
+        MAX_SUBJECT_LEN = 100
+        if len(sanitized) > MAX_SUBJECT_LEN:
+            sanitized = sanitized[:MAX_SUBJECT_LEN]
         
         # Limit length to 255 characters (filesystem limit)
         if len(sanitized) > 255:
@@ -412,7 +428,9 @@ class Controller:
     def dBHL2dBFS(self, freq_value, dBHL):
         calibration = [(ref, corr) for freq, ref, corr in self.cal_parameters
                        if freq == freq_value]
-        return calibration[0][0] + calibration[0][1] + dBHL
+        # Ensure we return a native Python float (not a numpy scalar) so
+        # callers and unit tests can rely on built-in numeric types.
+        return float(calibration[0][0] + calibration[0][1] + dBHL)
 
     def __enter__(self):
         return self

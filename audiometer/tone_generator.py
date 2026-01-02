@@ -23,8 +23,7 @@ class AudioStream:
             raise ValueError("attack and release have to be positive "
                              "and different from zero")
         
-        # CRITICAL: Always request 2 channels (stereo) for proper ear separation
-        # If device doesn't support stereo, we'll handle it gracefully but warn
+        # Request channels based on device capability (prefer stereo)
         req_channels = 2
         device_supports_stereo = True
         
@@ -34,6 +33,7 @@ class AudioStream:
                 max_out = int(devinfo.get('max_output_channels', 2))
                 if max_out < 2:
                     device_supports_stereo = False
+                    req_channels = max_out
                     logging.warning(
                         f"Selected audio device only supports {max_out} output channel(s). "
                         "Strict stereo separation may not be possible. "
@@ -47,7 +47,7 @@ class AudioStream:
         self._stream = sd.OutputStream(
             device=device,
             callback=self._callback,
-            channels=req_channels,  # Always 2 for stereo
+            channels=req_channels,
             samplerate=samplerate
         )
         
@@ -68,7 +68,8 @@ class AudioStream:
         # Initialize to zero (no output) until start() is called
         # Left Ear: [1.0, 0.0] -> signal only in left channel
         # Right Ear: [0.0, 1.0] -> signal only in right channel
-        self.channel_mask = np.array([0.0, 0.0])  # Initialize to zero, will be set in start()
+        # Initialize mask as float32 for safe broadcasting and low memory usage
+        self.channel_mask = np.array([0.0, 0.0], dtype=np.float32)
         
         self._stream.start()
 
@@ -96,7 +97,7 @@ class AudioStream:
             gain = np.maximum(target_gain, ramp)
         
         # Generate raw mono signal (1D array)
-        mono_signal = gain * np.sin(2 * np.pi * freq * k / samplerate)
+        signal = gain * np.sin(2 * np.pi * freq * k / samplerate)
         
         # CRITICAL: Stereo Masking Matrix approach
         # Validate output buffer has 2 channels (stereo)
@@ -108,7 +109,16 @@ class AudioStream:
             # mono_signal[:, np.newaxis] creates shape (frames, 1)
             # self.channel_mask has shape (2,)
             # Broadcasting: (frames, 1) * (2,) -> (frames, 2)
-            stereo_signal = mono_signal[:, np.newaxis] * self.channel_mask
+            # If channel_mask is not set (all zeros), fall back to _channel
+            if np.allclose(self.channel_mask, 0.0):
+                if self._channel == 0:
+                    mask = np.array([1.0, 0.0], dtype=np.float32)
+                else:
+                    mask = np.array([0.0, 1.0], dtype=np.float32)
+            else:
+                mask = self.channel_mask
+
+            stereo_signal = signal[:, np.newaxis] * mask
             outdata[:] = stereo_signal
             
             # Debug: Check if sound is actually being generated (first ~1 second only)
@@ -128,7 +138,7 @@ class AudioStream:
             logging.warning("Mono output detected (device reports 1 channel) - "
                           "strict stereo separation not possible. Playing to single channel.")
             print("DEBUG: WARNING - Mono output detected, playing to single channel")
-            outdata[:, 0] = mono_signal
+            outdata[:, 0] = signal
         else:
             # Invalid channel count
             outdata.fill(0)

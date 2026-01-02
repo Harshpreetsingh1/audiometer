@@ -19,6 +19,13 @@ import signal
 from datetime import datetime
 from pathlib import Path
 from ascending_method import AscendingMethod
+from audiometer.config import load_prefs, save_prefs
+
+# Load persisted preferences early so theme can be applied consistently
+_PREFERENCES = load_prefs()
+
+# Choose a theme; prefer dark on Windows
+DEFAULT_THEME = _PREFERENCES.get('theme', 'darkly') if sys.platform == 'win32' else _PREFERENCES.get('theme', 'superhero')
 
 
 class AudiometerUI(ttk.Window):
@@ -26,7 +33,7 @@ class AudiometerUI(ttk.Window):
     
     def __init__(self):
         """Initialize the GUI with Superhero (dark) theme."""
-        super().__init__(themename="superhero", title="PC Audiometer", resizable=(False, False))
+        super().__init__(themename=DEFAULT_THEME, title="PC Audiometer", resizable=(False, False))
         
         # Window configuration
         self.geometry("1200x800")
@@ -200,6 +207,40 @@ class AudiometerUI(ttk.Window):
             bootstyle="success-round-toggle"
         )
         right_ear_check.pack(anchor=W, pady=(0, 10))
+
+        # Windows-focused UI option: bring window to front and focus when test starts
+        # Windows-focused UI option: bring window to front and focus when test starts
+        self.win_focus_var = ttk.BooleanVar(value=_PREFERENCES.get('win_focus', sys.platform == 'win32'))
+        win_focus_check = ttk.Checkbutton(
+            config_frame,
+            text="Windows Focus Mode",
+            variable=self.win_focus_var,
+            bootstyle="info-round-toggle",
+            command=self._on_win_focus_toggle
+        )
+        win_focus_check.pack(anchor=W, pady=(0, 10))
+
+        # Dark theme toggle (Windows default is dark)
+        self.dark_theme_var = ttk.BooleanVar(value=(_PREFERENCES.get('theme', DEFAULT_THEME) == 'darkly'))
+        dark_theme_check = ttk.Checkbutton(
+            config_frame,
+            text="Dark Theme",
+            variable=self.dark_theme_var,
+            bootstyle="info-round-toggle",
+            command=self._on_dark_theme_toggle
+        )
+        dark_theme_check.pack(anchor=W, pady=(0, 10))
+
+        # Accessibility: High-contrast option
+        self.high_contrast_var = ttk.BooleanVar(value=_PREFERENCES.get('high_contrast', False))
+        high_contrast_check = ttk.Checkbutton(
+            config_frame,
+            text="High Contrast (Accessibility)",
+            variable=self.high_contrast_var,
+            bootstyle="warning-round-toggle",
+            command=self._on_high_contrast_toggle
+        )
+        high_contrast_check.pack(anchor=W, pady=(0, 10))
         
         # Action Button
         self.start_button = ttk.Button(
@@ -438,9 +479,21 @@ class AudiometerUI(ttk.Window):
         
         # Enable Response button
         self.patient_button.config(state=NORMAL, bootstyle="success")
+        # Give the response button keyboard focus for immediate interaction
+        try:
+            self.patient_button.focus_set()
+        except Exception:
+            pass
         
         # Disable input controls during test
         self._set_test_controls_state(DISABLED)
+
+        # Windows-focused behavior: bring window to front and focus
+        if getattr(self, 'win_focus_var', None) and self.win_focus_var.get():
+            try:
+                self._ensure_windows_focus()
+            except Exception as e:
+                logging.debug(f"Could not ensure windows focus: {e}")
         
         # Update status label
         self.status_label.config(text="Starting Test...", bootstyle="info")
@@ -604,6 +657,16 @@ class AudiometerUI(ttk.Window):
         self.start_button.config(state=NORMAL)
         self.stop_button.config(state=DISABLED)
         self.patient_button.config(state=DISABLED, bootstyle="primary")
+        # Ensure window is no longer forced topmost
+        try:
+            self.attributes('-topmost', False)
+        except Exception:
+            pass
+        # Return focus to Start button for quick restart
+        try:
+            self.start_button.focus_set()
+        except Exception:
+            pass
         
         self.status_label.config(text="Test Stopped", bootstyle="warning")
         self.ear_indicator_label.config(text="", bootstyle="warning")
@@ -619,6 +682,15 @@ class AudiometerUI(ttk.Window):
         self.start_button.config(state=NORMAL)
         self.stop_button.config(state=DISABLED)
         self.patient_button.config(state=DISABLED, bootstyle="primary")
+        # Ensure window is no longer forced topmost
+        try:
+            self.attributes('-topmost', False)
+        except Exception:
+            pass
+        try:
+            self.start_button.focus_set()
+        except Exception:
+            pass
         
         self.status_label.config(text="Test Completed!", bootstyle="success")
         self.ear_indicator_label.config(text="", bootstyle="warning")
@@ -646,6 +718,14 @@ class AudiometerUI(ttk.Window):
         self.start_button.config(state=NORMAL)
         self.stop_button.config(state=DISABLED)
         self.patient_button.config(state=DISABLED, bootstyle="primary")
+        try:
+            self.attributes('-topmost', False)
+        except Exception:
+            pass
+        try:
+            self.start_button.focus_set()
+        except Exception:
+            pass
         
         self.status_label.config(text=f"Error: {error_msg}", bootstyle="danger")
         self.ear_indicator_label.config(text="", bootstyle="warning")
@@ -677,25 +757,19 @@ class AudiometerUI(ttk.Window):
         pass
     
     def _on_ear_change_safe(self, ear_name):
-        """Thread-safe ear indicator update with clinical standard colors."""
+        """Thread-safe ear indicator update with clinical standard colors and status update."""
         try:
-            # Format: "TESTING: LEFT EAR" or "TESTING: RIGHT EAR"
-            ear_display = ear_name.upper() + " EAR"
-            
-            # Clinical standard: BLUE for Left Ear, RED for Right Ear
-            if ear_name.lower() == 'left':
-                bootstyle = 'info'  # Blue style
-            elif ear_name.lower() == 'right':
-                bootstyle = 'danger'  # Red style
+            if ear_name.lower() == 'right':
+                text = "TESTING: RIGHT EAR 🔴"
+                style = 'danger'
             else:
-                bootstyle = 'secondary'
-            
-            # Update with clear text and color coding
-            self.ear_indicator_label.config(
-                text=f"TESTING: {ear_display}",
-                font=("Helvetica", 24, "bold"),
-                bootstyle=bootstyle
-            )
+                text = "TESTING: LEFT EAR 🔵"
+                style = 'info'
+
+            # Update ear indicator and status label with matching styles
+            self.ear_indicator_label.config(text=text, bootstyle=style,
+                                            font=("Helvetica", 24, "bold"))
+            self.status_label.config(text=f"Switched to {ear_name.upper()} Ear", bootstyle=style)
         except Exception as e:
             print(f"Error updating ear indicator: {e}")
     
@@ -829,6 +903,68 @@ class AudiometerUI(ttk.Window):
                 os.system(f'xdg-open "{filepath}"')
         except Exception as e:
             print(f"Could not open file: {e}")
+
+    def _ensure_windows_focus(self):
+        """Bring the application window to the foreground and give focus.
+
+        Uses a combination of attributes('-topmost', True), focus_force(), and
+        platform-specific calls on Windows (ShowWindow / SetForegroundWindow)
+        to increase the chance the window becomes the active foreground window.
+        """
+        try:
+            # Temporarily make the window topmost so it appears above others
+            try:
+                self.attributes('-topmost', True)
+            except Exception:
+                pass
+
+            # Bring to front and focus
+            try:
+                self.update()
+                self.focus_force()
+                self.patient_button.focus_set()
+            except Exception:
+                pass
+
+            # Try Windows-specific foreground calls if available
+            if sys.platform == 'win32':
+                try:
+                    import ctypes
+                    hwnd = self.winfo_id()
+                    SW_SHOW = 5
+                    ctypes.windll.user32.ShowWindow(hwnd, SW_SHOW)
+                    ctypes.windll.user32.SetForegroundWindow(hwnd)
+                except Exception as e:
+                    logging.debug(f"Windows focus call failed: {e}")
+
+            # Remove topmost after a short delay so user can interact with other apps later
+            try:
+                self.after(300, lambda: self.attributes('-topmost', False))
+            except Exception:
+                pass
+
+        except Exception as e:
+            logging.debug(f"_ensure_windows_focus() error: {e}")
+
+    def _on_dark_theme_toggle(self):
+        """Apply dark or light theme at runtime when user toggles the checkbox."""
+        try:
+            use_dark = bool(self.dark_theme_var.get())
+            # Choose theme names - prefer 'darkly' for dark and 'litera' for light on Windows
+            if use_dark:
+                theme = 'darkly'
+            else:
+                theme = 'litera' if sys.platform == 'win32' else 'superhero'
+
+            # Attempt to switch ttkbootstrap theme at runtime
+            try:
+                ttk.Style().theme_use(theme)
+                # Refresh UI to apply theme changes
+                self.update()
+            except Exception as e:
+                logging.debug(f"Could not switch theme at runtime: {e}")
+        except Exception as e:
+            logging.debug(f"_on_dark_theme_toggle error: {e}")
 
 
 def main():

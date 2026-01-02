@@ -1,2 +1,3 @@
 INFO:keyboard module not available; using UI-only responder
 INFO:Randomized ear order: ['left', 'right']
+INFO:DEBUG: Initial ear sequence: ['left', 'right']
