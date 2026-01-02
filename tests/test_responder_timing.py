@@ -59,10 +59,24 @@ class FakeControllerForClickTest:
         self._audio.stop()
 
         if click_down:
-            start = time.time()
+            # Use recorded press/release timestamps when available to avoid
+            # timing races between threads and the end of tone playback.
+            press_ts = getattr(self._rpd, '_last_press_time', None)
+            # Wait for release (blocks until release)
             self._rpd.wait_for_click_up()
-            end = time.time()
-            if (end - start) <= self.config.tolerance:
+            release_ts = getattr(self._rpd, '_last_release_time', None)
+
+            if press_ts is not None and release_ts is not None:
+                duration = release_ts - press_ts
+            else:
+                # Fallback: measure elapsed time around wait_for_click_up
+                start = time.time()
+                # If release already happened, wait_for_click_up() returns immediately
+                self._rpd.wait_for_click_up()
+                end = time.time()
+                duration = end - start
+
+            if duration <= self.config.tolerance:
                 if stop_event and stop_event.is_set():
                     return False
                 self._progress_sleep(random.uniform(self.config.pause_time[0], self.config.pause_time[1]) if self.config.pause_time else 0, stop_event)

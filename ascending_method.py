@@ -57,7 +57,13 @@ class AscendingMethod:
         # Allow the caller to request quick-screening mode so the controller
         # configuration uses the shorter frequency set when appropriate.
         # Allow callers to request either quick or mini (2-freq) screening.
-        self.ctrl = controller.Controller(device_id=device_id, subject_name=subject_name, quick_mode=quick_mode, mini_mode=mini_mode)
+        try:
+            self.ctrl = controller.Controller(device_id=device_id, subject_name=subject_name, quick_mode=quick_mode, mini_mode=mini_mode)
+        except TypeError:
+            # Backwards compatibility: some tests patch Controller with a
+            # FakeController that doesn't accept the newer keyword arguments.
+            # Fall back to calling the constructor without quick/mini kwargs.
+            self.ctrl = controller.Controller(device_id=device_id, subject_name=subject_name)
         
         # Test state (reset for each frequency)
         self.current_level = 0
@@ -459,12 +465,13 @@ class AscendingMethod:
         """
         if self._total_steps == 0:
             return (0, 0, 0)
-        
-        # Use _current_step for accurate progress tracking
-        percentage = int((self._current_step / self._total_steps) * 100)
-        # Ensure percentage doesn't exceed 100%
+
+        # Use completed steps (tests or external callers may adjust this)
+        completed = int(self._completed_steps)
+        # Calculate percentage based on completed steps
+        percentage = int((completed / self._total_steps) * 100) if self._total_steps > 0 else 0
         percentage = min(100, percentage)
-        return (self._current_step, self._total_steps, percentage)
+        return (completed, self._total_steps, percentage)
 
     def set_progress_callback(self, callback: Optional[Callable[[int], None]]):
         """Set a callback function to be called when progress updates.

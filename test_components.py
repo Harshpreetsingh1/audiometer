@@ -164,26 +164,27 @@ def test_pysimplegui():
 
 test("Import PySimpleGUI", test_pysimplegui)
 
-# Print summary
-print("\n" + "=" * 70)
-print("TEST SUMMARY")
-print("=" * 70)
+if __name__ == '__main__':
+    # Print summary
+    print("\n" + "=" * 70)
+    print("TEST SUMMARY")
+    print("=" * 70)
 
-passed = sum(1 for _, result in test_results if result == "PASS")
-failed = len(test_results) - passed
+    passed = sum(1 for _, result in test_results if result == "PASS")
+    failed = len(test_results) - passed
 
-for name, result in test_results:
-    status = "✓" if result == "PASS" else "✗"
-    print(f"{status} {name}: {result}")
+    for name, result in test_results:
+        status = "✓" if result == "PASS" else "✗"
+        print(f"{status} {name}: {result}")
 
-print(f"\nTotal: {passed} passed, {failed} failed out of {len(test_results)}")
-print("=" * 70)
+    print(f"\nTotal: {passed} passed, {failed} failed out of {len(test_results)}")
+    print("=" * 70)
 
-if failed == 0:
-    print("\n✓ All components initialized successfully!")
-    print("The application should work. If it still exits on START TEST,")
-    print("run: python main_ui.py  and watch the console output for errors.")
-    sys.exit(0)
-else:
-    print(f"\n✗ {failed} component(s) failed initialization")
-    sys.exit(1)
+    if failed == 0:
+        print("\n✓ All components initialized successfully!")
+        print("The application should work. If it still exits on START TEST,")
+        print("run: python main_ui.py  and watch the console output for errors.")
+        sys.exit(0)
+    else:
+        print(f"\n✗ {failed} component(s) failed initialization")
+        sys.exit(1)

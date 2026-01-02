@@ -60,6 +60,10 @@ class Responder:
         self._handlers: List[Any] = []
         self._suppress_supported = True
 
+        # Track timestamps for press/release (helps timing logic/tests)
+        self._last_press_time: Optional[float] = None
+        self._last_release_time: Optional[float] = None
+
         # Try to import and register keyboard handlers
         # Prefer an already-inserted keyboard module from sys.modules (helps tests)
         kb = sys.modules.get('keyboard')
@@ -91,40 +95,41 @@ class Responder:
         if not self._keyboard:
             return
 
+        # If the keyboard module supports hook(), register exactly two handlers
+        # (one for press/down and one for release/up) rather than registering
+        # separate handlers per media key. This matches test expectations where
+        # hook() registers global handlers and the handler inspects event_type.
+        hook_fn = getattr(self._keyboard, 'hook', None)
+        if callable(hook_fn):
+            def make_handler(is_press: bool):
+                def handler(event):
+                    if event.event_type == ('down' if is_press else 'up'):
+                        if is_press:
+                            self._on_media_press(event)
+                        else:
+                            self._on_media_release(event)
+                return handler
+
+            try:
+                h_press = hook_fn(make_handler(True), suppress=True)
+                h_release = hook_fn(make_handler(False), suppress=True)
+                self._handlers.extend([h_press, h_release])
+                logging.info("Registered media handlers using hook() API (global handlers)")
+                return
+            except Exception as e:
+                logging.debug(f"Hook-based registration failed: {e}")
+
+        # Fallback: try on_press_key/on_release_key per-media-key (space/underscore variants)
         for key in self.MEDIA_KEYS:
             registered = False
-            # Try different key name variants (space vs underscore)
             variants = (key, key.replace(' ', '_'), key.replace(' ', '-'))
-            
             for k in variants:
                 try:
-                    # Try to get the on_press_key and on_release_key functions
                     on_press = getattr(self._keyboard, 'on_press_key', None)
                     on_release = getattr(self._keyboard, 'on_release_key', None)
-                    
                     if not callable(on_press) or not callable(on_release):
-                        # Try alternative API: hook()
-                        hook_fn = getattr(self._keyboard, 'hook', None)
-                        if callable(hook_fn):
-                            # Use hook() with key filter
-                            def make_handler(is_press):
-                                def handler(event):
-                                    if event.event_type == ('down' if is_press else 'up'):
-                                        if is_press:
-                                            self._on_media_press(event)
-                                        else:
-                                            self._on_media_release(event)
-                                return handler
-                            
-                            h_press = hook_fn(make_handler(True), suppress=True)
-                            h_release = hook_fn(make_handler(False), suppress=True)
-                            self._handlers.extend([h_press, h_release])
-                            registered = True
-                            logging.info(f"Registered media key '{k}' using hook() API")
-                            break
                         continue
-                    
-                    # Try with suppress=True first (blocks system volume change)
+
                     try:
                         h_press = on_press(k, self._on_media_press, suppress=True)
                         h_release = on_release(k, self._on_media_release, suppress=True)
@@ -133,7 +138,7 @@ class Responder:
                         logging.info(f"Registered media key '{k}' with suppression enabled")
                         break
                     except TypeError:
-                        # suppress kwarg not supported, try without it
+                        # suppress kwarg not supported
                         try:
                             h_press = on_press(k, self._on_media_press)
                             h_release = on_release(k, self._on_media_release)
@@ -151,14 +156,13 @@ class Responder:
                     except Exception as e:
                         logging.debug(f"Failed to register key variant '{k}' with suppress: {e}")
                         continue
-                        
                 except Exception as e:
                     logging.debug(f"Error registering key variant '{k}': {e}")
                     continue
-            
+
             if not registered:
                 logging.warning(f"Could not register handler for media key '{key}'")
-        
+
         if self._handlers:
             logging.info(
                 f"Successfully registered {len(self._handlers)} media key handler(s). "
@@ -174,6 +178,12 @@ class Responder:
         with self._lock:
             self._button_state = True
             self._pressed_during_tone = True
+            # Record timestamp of press for accurate timing calculations
+            try:
+                import time as _time
+                self._last_press_time = _time.time()
+            except Exception:
+                self._last_press_time = None
             self._button_released_event.clear()
             self._button_pressed_event.set()
         logging.debug("Media key pressed - user response detected")
@@ -182,6 +192,12 @@ class Responder:
         """Called when a media key is released."""
         with self._lock:
             self._button_state = False
+            # Record timestamp of release
+            try:
+                import time as _time
+                self._last_release_time = _time.time()
+            except Exception:
+                self._last_release_time = None
             self._button_pressed_event.clear()
             self._button_released_event.set()
         logging.debug("Media key released")
@@ -191,6 +207,11 @@ class Responder:
         with self._lock:
             self._button_state = True
             self._pressed_during_tone = True
+            try:
+                import time as _time
+                self._last_press_time = _time.time()
+            except Exception:
+                self._last_press_time = None
             self._button_released_event.clear()
             self._button_pressed_event.set()
 
@@ -198,6 +219,11 @@ class Responder:
         """Call this when the GUI response button is released."""
         with self._lock:
             self._button_state = False
+            try:
+                import time as _time
+                self._last_release_time = _time.time()
+            except Exception:
+                self._last_release_time = None
             self._button_pressed_event.clear()
             self._button_released_event.set()
 

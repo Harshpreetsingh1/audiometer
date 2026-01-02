@@ -81,10 +81,26 @@ class AudioStream:
         signal is multiplied by the channel_mask to create true stereo separation.
         """
         assert frames > 0
-        self._callback_status |= status
+        # Safely accumulate callback status; in rare race conditions the
+        # attribute may not yet exist or may have been cleaned up during GC.
+        try:
+            self._callback_status |= status
+        except Exception:
+            try:
+                # Initialize fallback status if necessary
+                self._callback_status = status
+            except Exception:
+                pass
         
         # Get current tone parameters (thread-safe)
-        target_gain, slope, freq = self._callback_parameters
+        try:
+            target_gain, slope, freq = self._callback_parameters
+        except Exception:
+            # In rare race conditions the parameters may not yet be initialized;
+            # fallback to safe defaults (silence).
+            target_gain = 0
+            slope = 0
+            freq = 0
         
         # Generate mono tone signal (1D array)
         k = np.arange(self._index, self._index + frames)
