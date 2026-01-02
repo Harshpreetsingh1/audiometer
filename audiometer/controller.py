@@ -142,13 +142,6 @@ class Controller:
             # Update results path to user folder
             self.config.results_path = user_results_path
             print(f"Results will be saved to user folder: {user_results_path}")
-            # Some tests inspect calls to makedirs expecting a nested path; to
-            # be tolerant of such assertions, attempt to create a nested folder
-            # (user_results_path/<sanitized_name>) as well, ignoring errors.
-            try:
-                os.makedirs(os.path.join(self.config.results_path, sanitized_name))
-            except Exception:
-                pass
 
         # CRITICAL FIX: Allow pre-opened csvfile from tests/config and ensure
         # the directory exists (with a sensible fallback if opening fails).
@@ -187,8 +180,9 @@ class Controller:
                     try:
                         self.csvfile = open(file_path, 'w', newline='', encoding='utf-8')
                         self.writer = csv.writer(self.csvfile)
-                        self.writer.writerow(['Conduction', self.config.conduction, None])
-                        self.writer.writerow(['Masking', self.config.masking, None])
+                        # Tests expect empty strings for unused header columns
+                        self.writer.writerow(['Conduction', self.config.conduction, ''])
+                        self.writer.writerow(['Masking', self.config.masking, ''])
                         self.writer.writerow(['Level/dB', 'Frequency/Hz', 'Earside'])
                     except FileNotFoundError:
                         # Fallback: if user folder path failed to be created, try the

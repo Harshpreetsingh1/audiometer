@@ -538,7 +538,7 @@ class AscendingMethod:
             - Audio stopped between tests
         """
         print("DEBUG: Entering AscendingMethod.run()")
-        if not self.ctrl.config.logging:
+        if not getattr(self.ctrl.config, 'logging', False):
             logging.disable(logging.CRITICAL)
         
         # Calculate total steps: (Number of Frequencies) * (Number of Ears)

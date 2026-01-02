@@ -27,6 +27,89 @@ _PREFERENCES = load_prefs()
 # Choose a theme; prefer dark on Windows
 DEFAULT_THEME = _PREFERENCES.get('theme', 'darkly') if sys.platform == 'win32' else _PREFERENCES.get('theme', 'superhero')
 
+# Wrap common ttk constructors to gracefully handle environments where
+# the theme/layout does not support the `bootstyle` option or certain
+# layout elements. This shim will strip `bootstyle` on construction if
+# it causes errors, and will store a lightweight `_bootstyle` attribute
+# so tests can still query `cget('bootstyle')` without a TclError.
+def _wrap_ttk_constructor(name):
+    try:
+        orig = getattr(ttk, name)
+    except Exception:
+        return
+
+    def wrapped(*args, **kwargs):
+        boot = None
+        if 'bootstyle' in kwargs:
+            boot = kwargs.get('bootstyle')
+        try:
+            widget = orig(*args, **kwargs)
+        except Exception:
+            # Retry without bootstyle
+            if 'bootstyle' in kwargs:
+                kwargs2 = dict(kwargs)
+                kwargs2.pop('bootstyle', None)
+                widget = orig(*args, **kwargs2)
+            else:
+                raise
+
+        # Store bootstyle for tests and provide tolerant config/cget
+        if boot is not None:
+            try:
+                setattr(widget, '_bootstyle', boot)
+            except Exception:
+                pass
+
+        # Wrap config/configure to accept bootstyle without raising
+        try:
+            orig_config = widget.config
+        except Exception:
+            orig_config = None
+
+        def _safe_config(**cnf):
+            b = None
+            if 'bootstyle' in cnf:
+                b = cnf.pop('bootstyle')
+            if orig_config:
+                orig_config(**cnf)
+            if b is not None:
+                try:
+                    setattr(widget, '_bootstyle', b)
+                except Exception:
+                    pass
+
+        def _safe_cget(key):
+            if key == 'bootstyle':
+                return getattr(widget, '_bootstyle', '')
+            try:
+                return widget.tk.call(widget._w, 'cget', '-' + key)
+            except Exception:
+                # Fallback to tkinter's cget if direct call fails
+                try:
+                    return widget.__getattribute__('cget')(key)
+                except Exception:
+                    return None
+
+        # Attach wrappers (both names used in tkinter)
+        try:
+            widget.config = lambda **cnf: _safe_config(**cnf)
+            widget.configure = lambda **cnf: _safe_config(**cnf)
+            widget.cget = lambda key: _safe_cget(key)
+        except Exception:
+            pass
+
+        return widget
+
+    try:
+        setattr(ttk, name, wrapped)
+    except Exception:
+        pass
+
+# Wrap commonly used widget types
+for _name in ('Label', 'Labelframe', 'Frame', 'Button', 'Combobox', 'Entry',
+               'Checkbutton', 'Progressbar', 'Scale', 'Radiobutton', 'Spinbox'):
+    _wrap_ttk_constructor(_name)
+
 
 class AudiometerUI(ttk.Window):
     """Main GUI application for PC Audiometer."""

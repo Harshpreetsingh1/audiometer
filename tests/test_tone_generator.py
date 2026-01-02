@@ -150,8 +150,8 @@ class TestToneGenerator(unittest.TestCase):
         mock_stream_class.return_value = mock_stream
 
         audio = tone_generator.AudioStream(device=None, attack=30, release=40)
-        # Simulate parameters like after start()
-        audio._channel = 0
+        # Simulate parameters like after start(): explicitly set the channel mask
+        audio.channel_mask = np.array([1.0, 0.0], dtype=float)
         audio._callback_parameters = (1.0, 0.1, 1000)
         audio._index = 0
         audio._last_gain = 0
@@ -171,8 +171,8 @@ class TestToneGenerator(unittest.TestCase):
         mock_stream_class.return_value = mock_stream
 
         audio = tone_generator.AudioStream(device=None, attack=30, release=40)
-        # Simulate parameters like after start()
-        audio._channel = 1
+        # Simulate parameters like after start(): explicitly set the channel mask
+        audio.channel_mask = np.array([0.0, 1.0], dtype=float)
         audio._callback_parameters = (1.0, 0.1, 1000)
         audio._index = 0
         audio._last_gain = 0
