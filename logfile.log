@@ -1,0 +1,2 @@
+DEBUG:_on_test_stopped UI update skipped due to error: main thread is not in main loop
+DEBUG:_on_test_completed UI update skipped due to error: main thread is not in main loop
