@@ -5,7 +5,9 @@ Requires USB headphones connected to the PC
 """
 
 import ttkbootstrap as ttk
-from ttkbootstrap.constants import *
+from ttkbootstrap.constants import (
+    NORMAL, DISABLED, CENTER, LEFT, RIGHT, W, E, X, Y, BOTH
+)
 from tkinter import messagebox as tk_messagebox
 import threading
 import sounddevice as sd
@@ -17,6 +19,7 @@ import logging
 import atexit
 import signal
 from datetime import datetime
+from typing import List
 from pathlib import Path
 from ascending_method import AscendingMethod
 from audiometer.config import load_prefs, save_prefs
@@ -207,7 +210,7 @@ class AudiometerUI(ttk.Window):
             font=("Helvetica", 18, "bold"),
             bootstyle="primary"
         )
-        title_label.pack(pady=(0, 10))
+        title_label.pack(pady=(0, 5))
         
         subtitle_label = ttk.Label(
             self.sidebar_frame,
@@ -215,7 +218,7 @@ class AudiometerUI(ttk.Window):
             font=("Helvetica", 10),
             bootstyle="secondary"
         )
-        subtitle_label.pack(pady=(0, 30))
+        subtitle_label.pack(pady=(0, 10))
         
         # Patient Details Section
         patient_frame = ttk.Labelframe(
@@ -224,7 +227,7 @@ class AudiometerUI(ttk.Window):
             padding=15,
             bootstyle="info"
         )
-        patient_frame.pack(fill=X, pady=(0, 15))
+        patient_frame.pack(fill=X, pady=(0, 5))
         
         # Name
         ttk.Label(patient_frame, text="Name:", font=("Helvetica", 9)).pack(anchor=W, pady=(0, 5))
@@ -262,9 +265,9 @@ class AudiometerUI(ttk.Window):
             padding=15,
             bootstyle="info"
         )
-        device_frame.pack(fill=X, pady=(0, 15))
+        device_frame.pack(fill=X, pady=(0, 5))
         
-        ttk.Label(device_frame, text="USB Headset:", font=("Helvetica", 9)).pack(anchor=W, pady=(0, 5))
+        ttk.Label(device_frame, text="Audio Output:", font=("Helvetica", 9)).pack(anchor=W, pady=(0, 5))
         self.device_var = ttk.StringVar()
         self.device_combo = ttk.Combobox(
             device_frame,
@@ -282,7 +285,7 @@ class AudiometerUI(ttk.Window):
             padding=15,
             bootstyle="info"
         )
-        config_frame.pack(fill=X, pady=(0, 20))
+        config_frame.pack(fill=X, pady=(0, 10))
         
         self.right_ear_first_var = ttk.BooleanVar(value=True)
         right_ear_check = ttk.Checkbutton(
@@ -357,7 +360,7 @@ class AudiometerUI(ttk.Window):
             width=25,
             padding=10
         )
-        self.start_button.pack(fill=X, pady=(0, 10))
+        self.start_button.pack(fill=X, pady=(10, 5))
         
         self.stop_button = ttk.Button(
             self.sidebar_frame,
@@ -487,16 +490,27 @@ class AudiometerUI(ttk.Window):
     def _load_audio_devices(self):
         """Load available audio output devices."""
         try:
-            devices = sd.query_devices()
+            try:
+                devices: List[dict] = sd.query_devices() # type: ignore
+            except Exception as e:
+                logging.error(f"Error querying audio devices: {e}")
+                devices = []
+
+            if not devices:
+                self._show_warning("No audio devices found.\n\nPlease check:\n1. Headphones are plugged in.\n2. Microphone access is allowed for apps in OS privacy settings.")
+                self.device_var.set("No devices found")
+                self.start_button.config(state=DISABLED)
+                return
+
             device_list = []
             default_device = None
             
             for i, d in enumerate(devices):
-                if d['max_output_channels'] > 0:
-                    device_str = f"{i}: {d['name']}"
+                if d.get('max_output_channels', 0) > 0:
+                    device_str = f"{i}: {d.get('name', 'Unknown Device')}"
                     device_list.append(device_str)
                     # Prefer USB devices
-                    if 'USB' in d['name'] and default_device is None:
+                    if 'USB' in d.get('name', '') and default_device is None:
                         default_device = device_str
 
             if device_list:
@@ -561,7 +575,7 @@ class AudiometerUI(ttk.Window):
         # Check device channel capability (warn if mono only)
         try:
             devinfo = sd.query_devices(device_id)
-            max_out = int(devinfo.get('max_output_channels', 2))
+            max_out = int(devinfo.get('max_output_channels', 2)) # type: ignore
             if max_out < 2:
                 response = self._show_warning(
                     "Selected device only supports mono output.\n"
@@ -792,6 +806,10 @@ class AudiometerUI(ttk.Window):
             self.stop_button.config(state=DISABLED)
             self.patient_button.config(state=DISABLED, bootstyle="primary")
             # Ensure window is no longer forced topmost
+            self._reset_ui_for_new_test()
+
+            self.status_label.config(text="Test Stopped", bootstyle="warning")
+            self.ear_indicator_label.config(text="", bootstyle="warning")
             try:
                 self.attributes('-topmost', False)
             except Exception:
@@ -802,8 +820,6 @@ class AudiometerUI(ttk.Window):
             except Exception:
                 pass
 
-            self.status_label.config(text="Test Stopped", bootstyle="warning")
-            self.ear_indicator_label.config(text="", bootstyle="warning")
             # Ensure running flag is cleared
             self.is_running = False
             self.test_stop_requested = False
@@ -830,10 +846,10 @@ class AudiometerUI(ttk.Window):
     def _on_test_completed(self, test):
         """Handle test completion."""
         try:
-            self._set_test_controls_state(NORMAL)
-            self.start_button.config(state=NORMAL)
-            self.stop_button.config(state=DISABLED)
-            self.patient_button.config(state=DISABLED, bootstyle="primary")
+            self._reset_ui_for_new_test()
+
+            self.status_label.config(text="Test Completed!", bootstyle="success")
+            self.ear_indicator_label.config(text="", bootstyle="warning")
             # Ensure window is no longer forced topmost
             try:
                 self.attributes('-topmost', False)
@@ -844,8 +860,6 @@ class AudiometerUI(ttk.Window):
             except Exception:
                 pass
 
-            self.status_label.config(text="Test Completed!", bootstyle="success")
-            self.ear_indicator_label.config(text="", bootstyle="warning")
             self.progress_var.set(100)
             self.progress_text.config(text="100%")
 
@@ -872,10 +886,7 @@ class AudiometerUI(ttk.Window):
     
     def _on_test_error(self, error_msg):
         """Handle test error."""
-        self._set_test_controls_state(NORMAL)
-        self.start_button.config(state=NORMAL)
-        self.stop_button.config(state=DISABLED)
-        self.patient_button.config(state=DISABLED, bootstyle="primary")
+        self._reset_ui_for_new_test()
         try:
             self.attributes('-topmost', False)
         except Exception:
@@ -915,22 +926,21 @@ class AudiometerUI(ttk.Window):
         pass
     
     def _on_ear_change_safe(self, ear_name):
-        """Thread-safe ear indicator update with clinical standard colors and status update."""
+        """Update UI with Clinical Colors (Red/Blue)."""
         try:
             if ear_name.lower() == 'right':
                 text = "TESTING: RIGHT EAR 🔴"
-                style = 'danger'
+                style = "danger" # Red
             else:
                 text = "TESTING: LEFT EAR 🔵"
-                style = 'info'
+                style = "info"   # Blue
 
-            # Update ear indicator and status label with matching styles
-            self.ear_indicator_label.config(text=text, bootstyle=style,
-                                            font=("Helvetica", 24, "bold"))
+            self.ear_indicator_label.config(text=text, bootstyle=style)
             self.status_label.config(text=f"Switched to {ear_name.upper()} Ear", bootstyle=style)
+            
         except Exception as e:
             print(f"Error updating ear indicator: {e}")
-    
+
     def _on_patient_button_press(self):
         """Handle patient response button press."""
         if self.is_running and self.current_test:
@@ -999,15 +1009,7 @@ class AudiometerUI(ttk.Window):
     def _poll_ui_updates(self):
         """Poll for UI state updates (status is now event-driven via callbacks)."""
         if self.is_running and self.current_test:
-            try:
-                # Only update button state, NOT status text (event-driven now)
-                # Enable patient button during test
-                if self.patient_button.cget("state") == DISABLED and self.is_running:
-                    self.patient_button.config(state=NORMAL)
-            
-            except Exception as e:
-                print(f"Error polling UI updates: {e}")
-        
+            pass  # Polling is no longer needed for primary UI state updates.
         # Schedule next poll (every 100ms)
         self.after(100, self._poll_ui_updates)
     
@@ -1036,6 +1038,16 @@ class AudiometerUI(ttk.Window):
         self.id_entry.config(state=state)
         self.device_combo.config(state=state)
         # Note: Checkbox state management if needed
+
+    def _reset_ui_for_new_test(self):
+        """Reset UI controls to their pre-test state."""
+        self._set_test_controls_state(NORMAL)
+        self.start_button.config(state=NORMAL)
+        self.stop_button.config(state=DISABLED)
+        self.patient_button.config(state=DISABLED, bootstyle="primary")
+        self.feedback_label.config(
+            text="Waiting for patient response...", bootstyle="secondary"
+        )
     
     def _show_error(self, message):
         """Show error message dialog."""
