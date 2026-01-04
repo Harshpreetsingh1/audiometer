@@ -49,6 +49,12 @@ def set_audiogram_parameters(dBHL, freqs, conduction, masking, earside,
     ax.set_yticks(minor_ticks, minor=True)
     ax.grid(which='both')
     ax.invert_yaxis()
+    
+    # Task 5: Add "Normal Hearing Ability" shaded region (-10dB to 25dB)
+    # This appears as a light blue/green band at the top of the chart
+    # Draw it first with low zorder so data lines appear on top
+    ax.axhspan(-10, 25, alpha=0.15, color='#4CAF50', zorder=0,
+               label='Normal Hearing (-10 to 25 dB)')
     ax.tick_params(axis='x', labelsize=6.5)
     ax.tick_params(axis='y', labelsize=6.5)
     #  one octave on the frequency axis shall correspond
@@ -137,6 +143,13 @@ def make_audiogram(filename, results_path=None):
         pdf_path = os.path.join(results_path, base_filename + '.pdf')
         f.savefig(pdf_path, dpi=300, bbox_inches='tight')
         print(f"Audiogram saved to: {pdf_path}")
+        
+        # Task 5: Also save PNG for web display
+        png_path = os.path.join(results_path, base_filename + '.png')
+        f.savefig(png_path, dpi=150, bbox_inches='tight', format='png')
+        print(f"Audiogram PNG saved to: {png_path}")
+        
+        plt.close(f)  # Clean up figure to prevent memory leaks
 
 
 def _read_audiogram(filename, results_path=None):

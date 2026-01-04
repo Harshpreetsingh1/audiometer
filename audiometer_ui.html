@@ -1,0 +1,985 @@
+<!DOCTYPE html>
+<html class="dark" lang="en">
+
+<head>
+    <meta charset="utf-8" />
+    <meta content="width=device-width, initial-scale=1.0" name="viewport" />
+    <title>Audiometer Pro Interface</title>
+    <!-- Fonts -->
+    <link href="https://fonts.googleapis.com" rel="preconnect" />
+    <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
+    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap"
+        rel="stylesheet" />
+    <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
+        rel="stylesheet" />
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com?plugins=forms,container-queries"></script>
+    <!-- Theme Configuration -->
+    <script>
+        tailwind.config = {
+            darkMode: "class",
+            theme: {
+                extend: {
+                    colors: {
+                        "primary": "#13ec5b",
+                        "primary-dim": "#0f7a35",
+                        "background-light": "#f6f8f6",
+                        "background-dark": "#050a07",
+                        "surface-dark": "#0e1a13",
+                        "surface-glass": "rgba(20, 30, 25, 0.7)",
+                        "accent-red": "#ff3b30",
+                        "accent-blue": "#007aff",
+                        "accent-yellow": "#ffcc00",
+                    },
+                    fontFamily: {
+                        "display": ["Space Grotesk", "sans-serif"],
+                        "body": ["Space Grotesk", "sans-serif"]
+                    },
+                    boxShadow: {
+                        'neon': '0 0 10px rgba(19, 236, 91, 0.3), 0 0 20px rgba(19, 236, 91, 0.1)',
+                        'neon-red': '0 0 10px rgba(255, 59, 48, 0.3), 0 0 20px rgba(255, 59, 48, 0.1)',
+                        'glow': '0 0 15px rgba(19, 236, 91, 0.5)',
+                        'response': '0 0 30px rgba(255, 204, 0, 0.6), inset 0 0 20px rgba(255, 204, 0, 0.8)',
+                    }
+                },
+            },
+        }
+    </script>
+    <style>
+        body {
+            font-family: "Space Grotesk", sans-serif;
+            user-select: none;
+        }
+
+        .glass-panel {
+            background: rgba(20, 30, 25, 0.6);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+        }
+
+        .meter-track {
+            stroke: #1c2e23;
+        }
+
+        .meter-fill-primary {
+            stroke: #13ec5b;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .meter-fill-secondary {
+            stroke: #13ec5b;
+            opacity: 0.7;
+            transition: stroke-dashoffset 0.5s ease;
+        }
+
+        .bg-tech-grid {
+            background-size: 40px 40px;
+            background-image:
+                linear-gradient(to right, rgba(19, 236, 91, 0.03) 1px, transparent 1px),
+                linear-gradient(to bottom, rgba(19, 236, 91, 0.03) 1px, transparent 1px);
+        }
+
+        /* Ear indicator colors */
+        .ear-left .ear-left-path {
+            stroke: #007aff !important;
+            filter: drop-shadow(0 0 8px rgba(0, 122, 255, 0.8));
+        }
+
+        .ear-left .ear-left-dot {
+            fill: #007aff !important;
+        }
+
+        .ear-left .ear-right-path {
+            stroke: #3a1a1a !important;
+            filter: none;
+        }
+
+        .ear-right .ear-right-path {
+            stroke: #ff3b30 !important;
+            filter: drop-shadow(0 0 8px rgba(255, 59, 48, 0.8));
+        }
+
+        .ear-right .ear-right-dot {
+            fill: #ff3b30 !important;
+        }
+
+        .ear-right .ear-left-path {
+            stroke: #1a2a3a !important;
+            filter: none;
+        }
+
+        .ear-none .ear-left-path,
+        .ear-none .ear-right-path {
+            stroke: #2a3f33 !important;
+            filter: none;
+        }
+
+        /* Signal LED active state */
+        .signal-btn.active .signal-glow {
+            opacity: 0.8 !important;
+        }
+
+        .signal-btn.active .signal-bulb {
+            background-color: #ffcc00 !important;
+            box-shadow: 0 0 30px rgba(255, 204, 0, 0.6), inset 0 0 20px rgba(255, 204, 0, 0.8) !important;
+        }
+
+        .signal-btn.active .signal-icon {
+            color: #78350f !important;
+        }
+
+        /* Test running state */
+        .test-running .start-btn {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        .test-stopped .stop-btn {
+            opacity: 0.5;
+            pointer-events: none;
+        }
+
+        /* Device dropdown */
+        select {
+            background-color: #0e1a13;
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        select:focus {
+            outline: none;
+            border-color: #13ec5b;
+        }
+    </style>
+</head>
+
+<body
+    class="bg-background-dark text-white min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black test-stopped">
+
+    <!-- Top Bar -->
+    <header class="flex items-center justify-between px-5 py-4 bg-background-dark border-b border-white/5 z-20">
+        <div class="flex items-center gap-3">
+            <div
+                class="flex items-center justify-center size-10 rounded-xl bg-primary/10 text-primary border border-primary/20">
+                <span class="material-symbols-outlined text-2xl">graphic_eq</span>
+            </div>
+            <div>
+                <h1 class="text-lg font-bold leading-none tracking-tight">Audiometer Pro</h1>
+                <div class="flex items-center gap-1.5 mt-1">
+                    <span class="relative flex h-2 w-2" id="connection-indicator">
+                        <span
+                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                        <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+                    </span>
+                    <span class="text-xs text-white/50 font-medium tracking-widest uppercase"
+                        id="connection-status">Ready</span>
+                </div>
+            </div>
+        </div>
+        <button
+            class="size-10 flex items-center justify-center rounded-full text-white/70 hover:bg-white/5 hover:text-white transition-colors"
+            onclick="toggleConfig()">
+            <span class="material-symbols-outlined">settings</span>
+        </button>
+    </header>
+
+    <main class="flex-1 flex flex-col relative bg-tech-grid p-4 gap-4 overflow-y-auto">
+
+        <!-- Patient Info Card -->
+        <section class="glass-panel rounded-2xl p-4 flex items-center justify-between shadow-lg">
+            <div class="flex items-center gap-4">
+                <div
+                    class="size-12 rounded-full bg-surface-dark border border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center">
+                    <span class="material-symbols-outlined text-white/30 text-2xl">person</span>
+                </div>
+                <div>
+                    <div class="flex items-center gap-2 mb-0.5">
+                        <input type="text" id="patient-name" placeholder="Patient Name"
+                            class="text-white font-bold text-lg leading-tight bg-transparent border-b border-white/20 focus:border-primary focus:outline-none w-40"
+                            value="">
+                        <input type="text" id="patient-id" placeholder="ID"
+                            class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/60 tracking-wider w-16 text-center border border-transparent focus:border-primary focus:outline-none"
+                            value="">
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <span class="text-primary text-sm font-medium">Age:</span>
+                        <input type="number" id="patient-age" placeholder="--"
+                            class="text-primary text-sm font-medium bg-transparent border-b border-white/20 focus:border-primary focus:outline-none w-12 text-center"
+                            value="">
+                    </div>
+                </div>
+            </div>
+            <div class="text-right">
+                <p class="text-white/40 text-xs font-medium uppercase tracking-wider mb-1" id="time-label">Time</p>
+                <p class="text-xl font-display font-bold tabular-nums tracking-tight" id="current-time">--:--</p>
+                <p class="text-xs text-primary font-medium mt-1 hidden" id="test-duration">Duration: 00:00</p>
+            </div>
+        </section>
+
+        <!-- Main Stage: Live Monitor -->
+        <section
+            class="flex-1 min-h-[400px] rounded-3xl bg-[#08100c] border border-white/5 relative overflow-hidden flex flex-col p-2 shadow-inner ear-none"
+            id="monitor-stage">
+
+            <!-- Decorative corner markers -->
+            <div class="absolute top-4 left-4 w-4 h-4 border-l-2 border-t-2 border-primary/30 rounded-tl-lg"></div>
+            <div class="absolute top-4 right-4 w-4 h-4 border-r-2 border-t-2 border-primary/30 rounded-tr-lg"></div>
+            <div class="absolute bottom-4 left-4 w-4 h-4 border-l-2 border-b-2 border-primary/30 rounded-bl-lg"></div>
+            <div class="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-primary/30 rounded-br-lg"></div>
+
+            <!-- Visualization Container -->
+            <div class="flex-1 flex flex-col items-center justify-center relative z-10 py-6">
+
+                <!-- Ear/Head Visual -->
+                <div class="relative w-64 h-64 flex items-center justify-center mb-6">
+                    <svg class="w-full h-full drop-shadow-2xl" viewbox="0 0 200 200">
+                        <!-- Head Shape -->
+                        <path
+                            d="M100 40 C 70 40 45 65 45 100 C 45 140 70 170 100 175 C 130 170 155 140 155 100 C 155 65 130 40 100 40 Z"
+                            fill="none" stroke="#2a3f33" stroke-width="2"></path>
+                        <!-- Left Ear -->
+                        <path class="ear-left-path" d="M35 90 C 25 90 20 100 20 110 C 20 125 35 135 45 130" fill="none"
+                            stroke="#2a3f33" stroke-linecap="round" stroke-width="4"></path>
+                        <circle class="ear-left-dot animate-pulse" cx="35" cy="110" fill="#2a3f33" r="4"></circle>
+                        <!-- Right Ear -->
+                        <path class="ear-right-path" d="M165 90 C 175 90 180 100 180 110 C 180 125 165 135 155 130"
+                            fill="none" stroke="#2a3f33" stroke-linecap="round" stroke-width="4"></path>
+                        <circle class="ear-right-dot animate-pulse hidden" cx="165" cy="110" fill="#2a3f33" r="4">
+                        </circle>
+                        <!-- Headphone band -->
+                        <path d="M35 90 C 35 30 165 30 165 90" fill="none" stroke="#2a3f33" stroke-dasharray="4 4"
+                            stroke-width="2"></path>
+                    </svg>
+
+                    <!-- Digital Readout Overlay -->
+                    <div class="absolute inset-0 flex items-center justify-center">
+                        <div
+                            class="text-center bg-background-dark/80 backdrop-blur-sm p-3 rounded-xl border border-white/5">
+                            <span class="block text-white/50 text-xs font-bold uppercase tracking-widest mb-1"
+                                id="ear-label">Ready</span>
+                            <span class="material-symbols-outlined text-white/30 text-3xl" id="ear-icon">hearing</span>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Prominent Ear Badge -->
+                <div id="ear-badge"
+                    class="hidden absolute top-4 left-1/2 transform -translate-x-1/2 px-6 py-2 rounded-full font-bold text-lg uppercase tracking-wider shadow-lg z-30">
+                    <span id="ear-badge-text">READY</span>
+                </div>
+
+                <!-- Meters Row -->
+                <div class="w-full grid grid-cols-2 gap-4 px-4">
+                    <!-- Frequency Meter -->
+                    <div class="flex flex-col items-center">
+                        <div class="relative size-32">
+                            <svg class="size-full -rotate-90 transform" viewbox="0 0 100 100">
+                                <circle class="meter-track" cx="50" cy="50" fill="none" r="45" stroke-width="8">
+                                </circle>
+                                <circle class="meter-fill-primary" id="freq-meter-fill" cx="50" cy="50" fill="none"
+                                    r="45" stroke-dasharray="283" stroke-dashoffset="283" stroke-width="8"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-2xl font-bold text-white tracking-tight" id="freq-value">--</span>
+                                <span class="text-xs font-medium text-white/50 uppercase">Hz</span>
+                            </div>
+                        </div>
+                        <span class="mt-2 text-sm font-medium text-primary tracking-wide">Frequency</span>
+                    </div>
+
+                    <!-- Level Meter -->
+                    <div class="flex flex-col items-center">
+                        <div class="relative size-32">
+                            <svg class="size-full -rotate-90 transform" viewbox="0 0 100 100">
+                                <circle class="meter-track" cx="50" cy="50" fill="none" r="45" stroke-width="8">
+                                </circle>
+                                <circle class="meter-fill-secondary" id="level-meter-fill" cx="50" cy="50" fill="none"
+                                    r="45" stroke-dasharray="283" stroke-dashoffset="283" stroke-width="8"></circle>
+                            </svg>
+                            <div class="absolute inset-0 flex flex-col items-center justify-center">
+                                <span class="text-2xl font-bold text-white tracking-tight" id="level-value">--</span>
+                                <span class="text-xs font-medium text-white/50 uppercase">dBHL</span>
+                            </div>
+                        </div>
+                        <span class="mt-2 text-sm font-medium text-primary tracking-wide">Level</span>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Virtual LED Response Button -->
+            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
+                <button class="relative signal-btn" id="signal-button" onmousedown="onPatientResponse(true)"
+                    onmouseup="onPatientResponse(false)" ontouchstart="onPatientResponse(true)"
+                    ontouchend="onPatientResponse(false)">
+                    <div
+                        class="signal-glow absolute inset-0 bg-accent-yellow rounded-full blur-xl opacity-0 transition-opacity duration-200">
+                    </div>
+                    <div
+                        class="signal-bulb relative size-16 rounded-full bg-surface-dark border-4 border-[#333] shadow-inner flex items-center justify-center overflow-hidden transition-colors duration-100">
+                        <span
+                            class="signal-icon material-symbols-outlined text-white/20 text-3xl transition-colors">lightbulb</span>
+                    </div>
+                    <span
+                        class="absolute -bottom-6 w-full text-center text-[10px] text-white/40 font-bold uppercase tracking-wider">I
+                        Hear It</span>
+                </button>
+            </div>
+        </section>
+
+        <!-- Progress Bar -->
+        <div class="w-full glass-panel rounded-xl p-3">
+            <div class="flex justify-between items-end mb-2">
+                <span class="text-xs font-bold text-white/70 uppercase tracking-widest">Test Progress</span>
+                <span class="text-sm font-bold text-primary font-display" id="progress-text">0%</span>
+            </div>
+            <div class="h-4 w-full bg-[#1c2e23] rounded-sm relative overflow-hidden">
+                <div class="absolute inset-0 w-full h-full"
+                    style="background-image: linear-gradient(90deg, transparent 95%, rgba(0,0,0,0.4) 95%); background-size: 10% 100%; z-index: 2;">
+                </div>
+                <div class="h-full bg-primary relative shadow-[0_0_10px_#13ec5b] transition-all duration-300"
+                    id="progress-fill" style="width: 0%;">
+                    <div class="absolute right-0 top-0 bottom-0 w-0.5 bg-white opacity-50"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Control Panel -->
+        <div class="grid grid-cols-2 gap-4">
+            <button
+                class="start-btn flex items-center justify-center gap-2 h-14 rounded-xl bg-primary text-black font-bold text-base shadow-neon hover:bg-[#34f374] active:scale-[0.98] transition-all"
+                onclick="startTest()">
+                <span class="material-symbols-outlined">play_arrow</span>
+                START TEST
+            </button>
+            <button
+                class="stop-btn flex items-center justify-center gap-2 h-14 rounded-xl bg-transparent border-2 border-accent-red text-accent-red font-bold text-base hover:bg-accent-red/10 hover:shadow-neon-red active:scale-[0.98] transition-all"
+                onclick="stopTest()">
+                <span class="material-symbols-outlined">stop_circle</span>
+                STOP
+            </button>
+        </div>
+
+        <!-- Device Configuration Panel -->
+        <div class="w-full" id="config-panel">
+            <div class="glass-panel rounded-xl p-4 space-y-4">
+                <div class="flex items-center gap-3 mb-4">
+                    <span class="material-symbols-outlined text-white/50">tune</span>
+                    <span class="text-white/80 font-medium text-sm">Device Configuration</span>
+                </div>
+
+                <!-- Device Selection -->
+                <div>
+                    <label class="block text-xs text-white/50 uppercase tracking-wider mb-2">Audio Output Device</label>
+                    <div class="flex gap-2">
+                        <select id="device-select" class="flex-1 h-10 px-3 rounded-lg text-sm">
+                            <option value="">Loading devices...</option>
+                        </select>
+                        <button
+                            class="size-10 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
+                            onclick="refreshDevices()">
+                            <span class="material-symbols-outlined text-white/50">refresh</span>
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Test Mode -->
+                <div class="grid grid-cols-2 gap-3">
+                    <label
+                        class="flex items-center gap-3 p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                        <input type="radio" name="test-mode" value="quick" checked class="accent-primary">
+                        <div>
+                            <span class="text-sm font-medium text-white">Quick Mode</span>
+                            <span class="block text-xs text-white/40">4 frequencies</span>
+                        </div>
+                    </label>
+                    <label
+                        class="flex items-center gap-3 p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
+                        <input type="radio" name="test-mode" value="mini" class="accent-primary">
+                        <div>
+                            <span class="text-sm font-medium text-white">Mini Mode</span>
+                            <span class="block text-xs text-white/40">2 frequencies</span>
+                        </div>
+                    </label>
+                </div>
+            </div>
+        </div>
+
+        <div class="h-4"></div>
+    </main>
+
+    <script>
+        // ============================================================
+        // State
+        // ============================================================
+        let isTestRunning = false;
+        let currentEar = null;
+        let currentFreq = null;
+        let currentLevel = null;
+        let statePollingInterval = null;
+
+        // Timer state (Task 1)
+        let timerInterval = null;
+        let testStartTime = null;
+        let testElapsedSeconds = 0;
+
+        // Test results storage (Task 4)
+        let testResults = { left: {}, right: {} };
+
+        // ============================================================
+        // Debounce & Guard State (Bug Fixes)
+        // ============================================================
+        let isStartButtonLocked = false;
+        let isStopButtonLocked = false;
+        let responseDebounceActive = false;
+        const BUTTON_DEBOUNCE_MS = 300;
+        const RESPONSE_DEBOUNCE_MS = 100;
+
+        // ============================================================
+        // Initialization
+        // ============================================================
+        document.addEventListener('DOMContentLoaded', () => {
+            updateClock();
+            setInterval(updateClock, 1000);
+
+            // Wait for pywebview to be ready
+            if (window.pywebview) {
+                initializePyWebView();
+            } else {
+                window.addEventListener('pywebviewready', initializePyWebView);
+            }
+        });
+
+        function initializePyWebView() {
+            console.log('PyWebView ready');
+            refreshDevices();
+            updateConnectionStatus('Connected', true);
+        }
+
+        // ============================================================
+        // Clock
+        // ============================================================
+        function updateClock() {
+            const now = new Date();
+            const hours = String(now.getHours()).padStart(2, '0');
+            const minutes = String(now.getMinutes()).padStart(2, '0');
+            document.getElementById('current-time').textContent = `${hours}:${minutes}`;
+        }
+
+        // ============================================================
+        // Test Timer (Task 1)
+        // ============================================================
+        function formatTime(totalSeconds) {
+            const minutes = Math.floor(totalSeconds / 60);
+            const seconds = totalSeconds % 60;
+            return `${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
+        }
+
+        function startTimer() {
+            // Reset timer state
+            testStartTime = Date.now();
+            testElapsedSeconds = 0;
+
+            // Show duration display
+            const durationEl = document.getElementById('test-duration');
+            durationEl.classList.remove('hidden');
+            durationEl.textContent = 'Duration: 00:00';
+            document.getElementById('time-label').textContent = 'Test Running';
+
+            // Clear any existing timer
+            if (timerInterval) {
+                clearInterval(timerInterval);
+            }
+
+            // Start interval timer - updates every second
+            timerInterval = setInterval(() => {
+                testElapsedSeconds = Math.floor((Date.now() - testStartTime) / 1000);
+                durationEl.textContent = `Duration: ${formatTime(testElapsedSeconds)}`;
+            }, 1000);
+        }
+
+        function stopTimer() {
+            // Stop the interval
+            if (timerInterval) {
+                clearInterval(timerInterval);
+                timerInterval = null;
+            }
+
+            // Keep final time displayed
+            const durationEl = document.getElementById('test-duration');
+            if (testElapsedSeconds > 0) {
+                durationEl.textContent = `Final: ${formatTime(testElapsedSeconds)}`;
+            }
+
+            document.getElementById('time-label').textContent = 'Time';
+        }
+
+        // ============================================================
+        // Patient Fields Locking (Task 2)
+        // ============================================================
+        function setPatientFieldsLocked(locked) {
+            const fields = [
+                document.getElementById('patient-name'),
+                document.getElementById('patient-id'),
+                document.getElementById('patient-age'),
+                document.getElementById('device-select')
+            ];
+
+            fields.forEach(field => {
+                if (field) {
+                    field.disabled = locked;
+                    if (locked) {
+                        field.classList.add('opacity-50', 'cursor-not-allowed');
+                    } else {
+                        field.classList.remove('opacity-50', 'cursor-not-allowed');
+                    }
+                }
+            });
+
+            // Disable radio buttons
+            const radios = document.querySelectorAll('input[name="test-mode"]');
+            radios.forEach(radio => {
+                radio.disabled = locked;
+            });
+        }
+
+        // ============================================================
+        // Connection Status
+        // ============================================================
+        function updateConnectionStatus(status, connected) {
+            document.getElementById('connection-status').textContent = status;
+            const indicator = document.getElementById('connection-indicator');
+            if (connected) {
+                indicator.innerHTML = `
+                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+            `;
+            } else {
+                indicator.innerHTML = `<span class="relative inline-flex rounded-full h-2 w-2 bg-accent-red"></span>`;
+            }
+        }
+
+        // ============================================================
+        // Device Management
+        // ============================================================
+        async function refreshDevices() {
+            try {
+                const devices = await window.pywebview.api.get_audio_devices();
+                const select = document.getElementById('device-select');
+                select.innerHTML = '';
+
+                if (devices.length === 0) {
+                    select.innerHTML = '<option value="">No devices found</option>';
+                    return;
+                }
+
+                devices.forEach(device => {
+                    const option = document.createElement('option');
+                    option.value = device.id;
+                    option.textContent = device.name;
+                    if (device.is_default) {
+                        option.selected = true;
+                    }
+                    select.appendChild(option);
+                });
+            } catch (e) {
+                console.error('Failed to load devices:', e);
+                document.getElementById('device-select').innerHTML = '<option value="">Error loading devices</option>';
+            }
+        }
+
+        // ============================================================
+        // Test Control
+        // ============================================================
+        async function startTest() {
+            // Guard clause: prevent double-click and race conditions
+            if (isTestRunning || isStartButtonLocked) {
+                console.log('Start blocked: test running or button locked');
+                return;
+            }
+
+            // Debounce: lock button immediately
+            isStartButtonLocked = true;
+            setTimeout(() => { isStartButtonLocked = false; }, BUTTON_DEBOUNCE_MS);
+
+            // Input validation
+            const deviceId = document.getElementById('device-select').value;
+            const patientName = document.getElementById('patient-name').value.trim();
+            const patientAge = document.getElementById('patient-age').value.trim();
+            const patientId = document.getElementById('patient-id').value.trim();
+            const testMode = document.querySelector('input[name="test-mode"]:checked').value;
+
+            // Validate device selection
+            if (!deviceId) {
+                alert('Please select an audio device');
+                return;
+            }
+
+            // Validate patient name (required)
+            if (!patientName) {
+                alert('Please enter patient name');
+                document.getElementById('patient-name').focus();
+                return;
+            }
+
+            // Validate age (optional but must be positive integer if provided)
+            if (patientAge) {
+                const ageNum = parseInt(patientAge, 10);
+                if (isNaN(ageNum) || ageNum <= 0 || ageNum > 150) {
+                    alert('Age must be a positive number between 1 and 150');
+                    document.getElementById('patient-age').focus();
+                    return;
+                }
+            }
+
+            try {
+                const result = await window.pywebview.api.start_test(
+                    parseInt(deviceId),
+                    patientName || 'Unknown Patient',
+                    patientAge,
+                    patientId,
+                    testMode === 'quick',
+                    testMode === 'mini'
+                );
+
+                if (result.success) {
+                    isTestRunning = true;
+                    document.body.classList.remove('test-stopped');
+                    document.body.classList.add('test-running');
+                    updateConnectionStatus('Testing', true);
+
+                    // Task 1: Start the timer
+                    startTimer();
+
+                    // Task 2: Lock patient fields
+                    setPatientFieldsLocked(true);
+
+                    // Task 4: Reset results storage
+                    testResults = { left: {}, right: {} };
+
+                    // Start polling for state updates
+                    statePollingInterval = setInterval(pollTestState, 200);
+                } else {
+                    alert('Failed to start test: ' + result.error);
+                }
+            } catch (e) {
+                console.error('Start test error:', e);
+                alert('Error starting test: ' + (e.message || 'Unknown error'));
+            }
+        }
+
+        async function stopTest() {
+            // Guard clause: prevent double-click
+            if (!isTestRunning || isStopButtonLocked) {
+                console.log('Stop blocked: not running or button locked');
+                return;
+            }
+
+            // Debounce: lock button immediately
+            isStopButtonLocked = true;
+            setTimeout(() => { isStopButtonLocked = false; }, BUTTON_DEBOUNCE_MS);
+
+            try {
+                await window.pywebview.api.stop_test();
+                onTestStopped();
+            } catch (e) {
+                console.error('Stop test error:', e);
+                // Force UI reset on error to prevent stuck state
+                onTestStopped();
+            }
+        }
+
+        function onTestStopped() {
+            isTestRunning = false;
+            document.body.classList.remove('test-running');
+            document.body.classList.add('test-stopped');
+            updateConnectionStatus('Ready', true);
+
+            // Task 1: Stop the timer
+            stopTimer();
+
+            // Task 2: Unlock patient fields
+            setPatientFieldsLocked(false);
+
+            if (statePollingInterval) {
+                clearInterval(statePollingInterval);
+                statePollingInterval = null;
+            }
+
+            // Reset UI
+            setEar(null);
+            setFrequency(null);
+            setLevel(null);
+
+            // Hide ear badge
+            document.getElementById('ear-badge').classList.add('hidden');
+        }
+
+        async function pollTestState() {
+            try {
+                const state = await window.pywebview.api.get_test_state();
+
+                if (!state.is_running) {
+                    onTestStopped();
+                    if (state.completed) {
+                        updateConnectionStatus('Completed', true);
+                        setProgress(100);
+
+                        // Task 4: Auto-export CSV on completion
+                        exportResultsCSV();
+                    }
+                    return;
+                }
+
+                // Update UI from state
+                if (state.ear !== currentEar) {
+                    setEar(state.ear);
+                }
+                if (state.frequency !== currentFreq) {
+                    setFrequency(state.frequency);
+                }
+                if (state.level !== currentLevel) {
+                    setLevel(state.level);
+                }
+                setProgress(state.progress);
+
+            } catch (e) {
+                console.error('Poll state error:', e);
+            }
+        }
+
+        // ============================================================
+        // Patient Response
+        // ============================================================
+        async function onPatientResponse(pressed) {
+            const btn = document.getElementById('signal-button');
+
+            // Debounce rapid clicks to prevent API spam
+            if (pressed && responseDebounceActive) {
+                return;
+            }
+
+            if (pressed) {
+                responseDebounceActive = true;
+                setTimeout(() => { responseDebounceActive = false; }, RESPONSE_DEBOUNCE_MS);
+
+                btn.classList.add('active');
+                try {
+                    await window.pywebview.api.patient_response(true);
+                } catch (e) {
+                    console.debug('Patient response (press) error:', e);
+                }
+            } else {
+                btn.classList.remove('active');
+                try {
+                    await window.pywebview.api.patient_response(false);
+                } catch (e) {
+                    console.debug('Patient response (release) error:', e);
+                }
+            }
+        }
+
+        // Also support spacebar
+        document.addEventListener('keydown', (e) => {
+            if (e.code === 'Space' && !e.repeat) {
+                e.preventDefault();
+                onPatientResponse(true);
+            }
+        });
+        document.addEventListener('keyup', (e) => {
+            if (e.code === 'Space') {
+                e.preventDefault();
+                onPatientResponse(false);
+            }
+        });
+
+        // ============================================================
+        // UI Updates
+        // ============================================================
+        function setEar(ear) {
+            currentEar = ear;
+            const stage = document.getElementById('monitor-stage');
+            const label = document.getElementById('ear-label');
+            const icon = document.getElementById('ear-icon');
+            const badge = document.getElementById('ear-badge');
+            const badgeText = document.getElementById('ear-badge-text');
+
+            stage.classList.remove('ear-left', 'ear-right', 'ear-none');
+
+            if (ear === 'left') {
+                stage.classList.add('ear-left');
+                label.textContent = 'Testing Left';
+                label.className = 'block text-accent-blue text-xs font-bold uppercase tracking-widest mb-1';
+                icon.className = 'material-symbols-outlined text-accent-blue text-3xl';
+
+                // Task 3: Show prominent ear badge
+                badge.classList.remove('hidden', 'bg-accent-red', 'text-white');
+                badge.classList.add('bg-accent-blue', 'text-white');
+                badgeText.textContent = '🔵 TESTING: LEFT EAR';
+            } else if (ear === 'right') {
+                stage.classList.add('ear-right');
+                label.textContent = 'Testing Right';
+                label.className = 'block text-accent-red text-xs font-bold uppercase tracking-widest mb-1';
+                icon.className = 'material-symbols-outlined text-accent-red text-3xl';
+
+                // Task 3: Show prominent ear badge
+                badge.classList.remove('hidden', 'bg-accent-blue', 'text-white');
+                badge.classList.add('bg-accent-red', 'text-white');
+                badgeText.textContent = '🔴 TESTING: RIGHT EAR';
+            } else {
+                stage.classList.add('ear-none');
+                label.textContent = 'Ready';
+                label.className = 'block text-white/50 text-xs font-bold uppercase tracking-widest mb-1';
+                icon.className = 'material-symbols-outlined text-white/30 text-3xl';
+
+                // Hide badge when not testing
+                badge.classList.add('hidden');
+            }
+        }
+
+        function setFrequency(freq) {
+            currentFreq = freq;
+            const valueEl = document.getElementById('freq-value');
+            const fillEl = document.getElementById('freq-meter-fill');
+
+            if (freq === null) {
+                valueEl.textContent = '--';
+                fillEl.style.strokeDashoffset = '283';
+                return;
+            }
+
+            valueEl.textContent = freq;
+            // Map frequency to meter (125Hz - 8000Hz range)
+            const freqLog = Math.log10(freq);
+            const minLog = Math.log10(125);
+            const maxLog = Math.log10(8000);
+            const percent = (freqLog - minLog) / (maxLog - minLog);
+            const offset = 283 - (283 * percent);
+            fillEl.style.strokeDashoffset = offset;
+        }
+
+        function setLevel(level) {
+            currentLevel = level;
+            const valueEl = document.getElementById('level-value');
+            const fillEl = document.getElementById('level-meter-fill');
+
+            if (level === null) {
+                valueEl.textContent = '--';
+                fillEl.style.strokeDashoffset = '283';
+                return;
+            }
+
+            valueEl.textContent = level;
+            // Map level to meter (-10 to 100 dBHL range)
+            const percent = (level + 10) / 110;
+            const offset = 283 - (283 * Math.max(0, Math.min(1, percent)));
+            fillEl.style.strokeDashoffset = offset;
+        }
+
+        function setProgress(percent) {
+            document.getElementById('progress-text').textContent = Math.round(percent) + '%';
+            document.getElementById('progress-fill').style.width = percent + '%';
+        }
+
+        function toggleConfig() {
+            const panel = document.getElementById('config-panel');
+            panel.classList.toggle('hidden');
+        }
+
+        // ============================================================
+        // Called from Python
+        // ============================================================
+        window.updateFromPython = function (data) {
+            if (data.ear !== undefined) setEar(data.ear);
+            if (data.frequency !== undefined) setFrequency(data.frequency);
+            if (data.level !== undefined) setLevel(data.level);
+            if (data.progress !== undefined) setProgress(data.progress);
+            if (data.stopped) onTestStopped();
+            if (data.signal_flash) {
+                const btn = document.getElementById('signal-button');
+                btn.classList.add('active');
+                setTimeout(() => btn.classList.remove('active'), 200);
+            }
+
+            // Task 4: Store results as they come in
+            if (data.result) {
+                const { ear, frequency, level } = data.result;
+                if (ear && frequency !== undefined && level !== undefined) {
+                    testResults[ear][frequency] = level;
+                }
+            }
+        };
+
+        // ============================================================
+        // CSV Export (Task 4)
+        // ============================================================
+        async function exportResultsCSV() {
+            try {
+                // Get results from backend
+                const results = await window.pywebview.api.get_results();
+
+                if (!results || !results.success) {
+                    console.log('No results to export:', results?.error || 'Unknown error');
+                    return;
+                }
+
+                const data = results.data;
+                const frequencies = [125, 250, 500, 1000, 2000, 4000, 8000];
+
+                // Check for incomplete data and warn user
+                let totalExpected = frequencies.length * 2; // Both ears
+                let totalFound = 0;
+                frequencies.forEach(freq => {
+                    if (data.right[freq] !== undefined) totalFound++;
+                    if (data.left[freq] !== undefined) totalFound++;
+                });
+
+                if (totalFound < totalExpected) {
+                    console.warn(`Incomplete test data: ${totalFound}/${totalExpected} measurements recorded`);
+                    // Add warning to CSV
+                }
+
+                // Build CSV content with completeness note
+                let csvContent = '';
+                if (totalFound < totalExpected) {
+                    csvContent += `# WARNING: Incomplete test - only ${totalFound}/${totalExpected} measurements\n`;
+                }
+                csvContent += 'Frequency (Hz),Right Ear (dB),Left Ear (dB)\n';
+
+                frequencies.forEach(freq => {
+                    const rightVal = data.right[freq] !== undefined ? data.right[freq] : '';
+                    const leftVal = data.left[freq] !== undefined ? data.left[freq] : '';
+                    csvContent += `${freq},${rightVal},${leftVal}\n`;
+                });
+
+                // Create download
+                const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+                const url = URL.createObjectURL(blob);
+                const link = document.createElement('a');
+
+                // Generate filename with timestamp (sanitize patient name)
+                const now = new Date();
+                const timestamp = now.toISOString().slice(0, 19).replace(/[T:]/g, '-');
+                const rawPatientName = document.getElementById('patient-name').value || 'patient';
+                // Sanitize filename: remove special chars that could break filesystem
+                const patientName = rawPatientName.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_');
+                const filename = `audiogram_${patientName}_${timestamp}.csv`;
+
+                link.setAttribute('href', url);
+                link.setAttribute('download', filename);
+                link.style.visibility = 'hidden';
+                document.body.appendChild(link);
+                link.click();
+                document.body.removeChild(link);
+                URL.revokeObjectURL(url);
+
+                console.log('CSV exported:', filename, totalFound < totalExpected ? '(INCOMPLETE)' : '(COMPLETE)');
+            } catch (e) {
+                console.error('CSV export failed:', e);
+            }
+        }
+    </script>
+
+</body>
+
+</html>

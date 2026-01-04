@@ -69,7 +69,11 @@ def _wrap_ttk_constructor(name):
         except Exception:
             orig_config = None
 
-        def _safe_config(**cnf):
+        def _safe_config(cnf_dict=None, **cnf):
+            # Merge positional dict argument with keyword arguments
+            # tkinter's __setitem__ calls configure({key: value})
+            if cnf_dict is not None:
+                cnf.update(cnf_dict)
             b = None
             if 'bootstyle' in cnf:
                 b = cnf.pop('bootstyle')
@@ -95,8 +99,8 @@ def _wrap_ttk_constructor(name):
 
         # Attach wrappers (both names used in tkinter)
         try:
-            widget.config = lambda **cnf: _safe_config(**cnf)
-            widget.configure = lambda **cnf: _safe_config(**cnf)
+            widget.config = lambda cnf_dict=None, **cnf: _safe_config(cnf_dict, **cnf)
+            widget.configure = lambda cnf_dict=None, **cnf: _safe_config(cnf_dict, **cnf)
             widget.cget = lambda key: _safe_cget(key)
         except Exception:
             pass
