@@ -57,7 +57,7 @@ def main():
     if not test_imports():
         logger.error("Import test failed. Exiting.")
         return
-    
+        
     # Test audio devices
     if not test_audio_devices():
         logger.warning("Audio device test failed, but continuing...")
