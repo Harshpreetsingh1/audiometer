@@ -267,16 +267,27 @@ class AudiometerUI(ttk.Window):
         )
         device_frame.pack(fill=X, pady=(0, 5))
         
-        ttk.Label(device_frame, text="Audio Output:", font=("Helvetica", 9)).pack(anchor=W, pady=(0, 5))
+        device_input_frame = ttk.Frame(device_frame)
+        device_input_frame.pack(fill=X)
+        
+        ttk.Label(device_input_frame, text="Audio Output:", font=("Helvetica", 9)).pack(anchor=W, pady=(0, 5))
         self.device_var = ttk.StringVar()
         self.device_combo = ttk.Combobox(
-            device_frame,
+            device_input_frame,
             textvariable=self.device_var,
-            width=23,
             state="readonly",
             font=("Helvetica", 10)
         )
-        self.device_combo.pack(fill=X)
+        self.device_combo.pack(side=LEFT, fill=X, expand=True, padx=(0, 5))
+        
+        self.refresh_devices_button = ttk.Button(
+            device_input_frame,
+            text="🔄",
+            command=self._load_audio_devices,
+            bootstyle="secondary-outline",
+            width=2
+        )
+        self.refresh_devices_button.pack(side=RIGHT)
         
         # Test Config Section
         config_frame = ttk.Labelframe(
@@ -488,42 +499,63 @@ class AudiometerUI(ttk.Window):
         self.main_frame.pack(side=RIGHT, fill=BOTH, expand=True, padx=(2, 0))
     
     def _load_audio_devices(self):
-        """Load available audio output devices."""
+        """Load audio devices with AGGRESSIVE error reporting."""
         try:
+            # 1. Force PortAudio Refresh
             try:
-                devices: List[dict] = sd.query_devices() # type: ignore
-            except Exception as e:
-                logging.error(f"Error querying audio devices: {e}")
-                devices = []
+                sd._terminate()
+                sd._initialize()
+            except Exception:
+                pass # Ignore if already closed
 
-            if not devices:
-                self._show_warning("No audio devices found.\n\nPlease check:\n1. Headphones are plugged in.\n2. Microphone access is allowed for apps in OS privacy settings.")
-                self.device_var.set("No devices found")
-                self.start_button.config(state=DISABLED)
-                return
-
+            # 2. Query Devices
+            devices = sd.query_devices()
             device_list = []
             default_device = None
             
+            # 3. Filter Output Devices
             for i, d in enumerate(devices):
                 if d.get('max_output_channels', 0) > 0:
-                    device_str = f"{i}: {d.get('name', 'Unknown Device')}"
+                    name = d.get('name', 'Unknown Device')
+                    device_str = f"{i}: {name}"
                     device_list.append(device_str)
-                    # Prefer USB devices
-                    if 'USB' in d.get('name', '') and default_device is None:
+                    if 'USB' in name and default_device is None:
                         default_device = device_str
 
+            # 4. Update UI
             if device_list:
                 self.device_combo['values'] = device_list
                 if default_device:
                     self.device_var.set(default_device)
                 else:
                     self.device_var.set(device_list[0])
+                self.start_button.config(state=NORMAL)
+                # Debug Success
+                print(f"DEBUG: Loaded {len(device_list)} devices.")
             else:
-                self.device_var.set("No devices found")
+                # CASE: Privacy Settings Blocking
+                self.device_var.set("NO DEVICES FOUND")
                 self.start_button.config(state=DISABLED)
+                tk_messagebox.showwarning(
+                    "No Audio Devices",
+                    "PortAudio found 0 output devices.\n\n"
+                    "POSSIBLE CAUSE: Windows Microphone Privacy Settings.\n"
+                    "FIX: Go to Settings > Privacy > Microphone -> Turn ON 'Allow desktop apps'."
+                )
+
         except Exception as e:
-            self.status_label.config(text=f"Error loading devices: {e}", bootstyle="danger")
+            # CASE: Missing DLL or Driver Crash
+            import traceback
+            error_trace = traceback.format_exc()
+            self.device_var.set("DRIVER ERROR")
+            self.start_button.config(state=DISABLED)
+            
+            tk_messagebox.showerror(
+                "Critical Audio Error",
+                f"Failed to load SoundDevice.\n\nError: {e}\n\n"
+                f"Traceback:\n{error_trace}"
+            )
+            print(error_trace)
     
     def _start_test(self):
         """Start the hearing test in a background thread.
