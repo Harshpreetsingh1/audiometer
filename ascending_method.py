@@ -44,6 +44,10 @@ class AscendingMethod:
         - State is completely isolated between ears
     """
     
+    # Estimated average number of tone plays to find a threshold per frequency
+    # Used for granular progress calculation
+    ESTIMATED_TRIALS_PER_FREQ = 15
+    
     def __init__(self, device_id=None, subject_name=None, progress_callback=None, ear_change_callback=None, freq_change_callback=None, quick_mode: bool = False, mini_mode: bool = False):
         """Initialize the ascending method test.
         
@@ -134,6 +138,9 @@ class AscendingMethod:
         self.current_level = 0
         self.click = True
         
+        # Reset granular progress counter for this frequency
+        self._sub_step_counter = 0
+        
         # Clear responder state to ensure no button presses carry over
         try:
             self.ctrl._rpd.clear()
@@ -150,6 +157,34 @@ class AscendingMethod:
             pass
         
         logging.debug(f"State reset for {self.earside} ear at {self.freq} Hz")
+    
+    def _report_granular_progress(self, sub_step_count):
+        """Report granular progress within a frequency test.
+        
+        This provides smooth, continuous progress updates during each frequency
+        test instead of only updating when a frequency completes.
+        
+        Args:
+            sub_step_count: Number of sub-steps (tone plays) completed in current frequency
+        """
+        if self._total_steps == 0:
+            return
+        
+        # Calculate base progress (completed frequencies)
+        base_progress = (self._completed_steps / self._total_steps) * 100
+        
+        # Calculate sub-progress (current activity within this frequency)
+        # Cap sub-progress at 90% of a single step to prevent overshooting
+        step_weight = 100 / self._total_steps
+        sub_progress = (sub_step_count / self.ESTIMATED_TRIALS_PER_FREQ) * step_weight * 0.9
+        
+        total_progress = min(99, base_progress + sub_progress)
+        
+        if self._progress_callback:
+            try:
+                self._progress_callback(total_progress)
+            except Exception as e:
+                logging.debug(f"Error calling granular progress callback: {e}")
 
     def decrement_click(self, level_decrement):
         """Decrement level and test tone.
@@ -168,6 +203,10 @@ class AscendingMethod:
         self.current_level -= level_decrement
         self.click = self.ctrl.clicktone(self.freq, self.current_level,
                                          self.earside, stop_event=self.stop_event)
+        
+        # Report granular progress after each tone play
+        self._sub_step_counter += 1
+        self._report_granular_progress(self._sub_step_counter)
 
     def increment_click(self, level_increment):
         """Increment level and test tone.
@@ -186,6 +225,10 @@ class AscendingMethod:
         self.current_level += level_increment
         self.click = self.ctrl.clicktone(self.freq, self.current_level,
                                          self.earside, stop_event=self.stop_event)
+        
+        # Report granular progress after each tone play
+        self._sub_step_counter += 1
+        self._report_granular_progress(self._sub_step_counter)
 
     def familiarization(self):
         """Familiarization phase: find initial audibility threshold.
@@ -254,6 +297,10 @@ class AscendingMethod:
             logging.info("Familiarization: -%s dB", self.ctrl.config.large_level_decrement)
             self.decrement_click(self.ctrl.config.large_level_decrement)
             
+            # Report granular progress during familiarization
+            self._sub_step_counter += 1
+            self._report_granular_progress(self._sub_step_counter)
+            
             # Check stop event after decrement
             if self.stop_event.is_set():
                 self.ctrl.stop_audio_immediately()
@@ -273,6 +320,10 @@ class AscendingMethod:
             
             logging.info("Familiarization: +%s dB", self.ctrl.config.large_level_increment)
             self.increment_click(self.ctrl.config.large_level_increment)
+            
+            # Report granular progress during familiarization
+            self._sub_step_counter += 1
+            self._report_granular_progress(self._sub_step_counter)
             
             # Check stop event after increment
             if self.stop_event.is_set():
