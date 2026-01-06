@@ -478,8 +478,13 @@ class AudiometerAPI:
             if not self.db:
                 return {'success': False, 'error': 'Database not initialized'}
             
+            # Validate required fields
+            name = patient_data.get('name')
+            if not name or not str(name).strip():
+                return {'success': False, 'error': 'Patient name is required'}
+            
             patient_id = self.db.add_patient(
-                name=patient_data.get('name', ''),
+                name=str(name).strip(),
                 phone=patient_data.get('phone'),
                 age=int(patient_data['age']) if patient_data.get('age') else None,
                 gender=patient_data.get('gender'),

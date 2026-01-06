@@ -1450,6 +1450,16 @@
             document.getElementById('patient-search-modal').classList.add('hidden');
         }
 
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
         async function searchPatient() {
             const query = document.getElementById('patient-search-input').value.trim();
             if (!query) {
@@ -1464,7 +1474,7 @@
                 const result = await window.pywebview.api.search_patient(query);
 
                 if (!result.success) {
-                    resultsDiv.innerHTML = `<p class="text-accent-red text-center py-4">${result.error}</p>`;
+                    resultsDiv.innerHTML = `<p class="text-accent-red text-center py-4">${escapeHtml(result.error)}</p>`;
                     return;
                 }
 
@@ -1480,8 +1490,8 @@
                              onclick="loadPatientForTest(${patient.id})">
                             <div class="flex items-center justify-between">
                                 <div>
-                                    <p class="text-white font-medium">${patient.name}</p>
-                                    <p class="text-text-muted text-sm">${patient.phone || 'No phone'} | ID: ${patient.patient_ref_id || '--'}</p>
+                                    <p class="text-white font-medium">${escapeHtml(patient.name)}</p>
+                                    <p class="text-text-muted text-sm">${escapeHtml(patient.phone || 'No phone')} | ID: ${escapeHtml(patient.patient_ref_id || '--')}</p>
                                 </div>
                                 <div class="flex items-center gap-2">
                                     <button onclick="event.stopPropagation(); viewPatientHistory(${patient.id})"
@@ -1546,8 +1556,8 @@
 
                 let html = `
                     <div class="mb-4 p-4 bg-primary/10 rounded-lg border border-primary/30">
-                        <h4 class="text-white font-bold">${patient.name}</h4>
-                        <p class="text-text-muted text-sm">${patient.phone || 'No phone'} | ${history.length} previous test(s)</p>
+                        <h4 class="text-white font-bold">${escapeHtml(patient.name)}</h4>
+                        <p class="text-text-muted text-sm">${escapeHtml(patient.phone || 'No phone')} | ${history.length} previous test(s)</p>
                     </div>
                 `;
 
@@ -1560,8 +1570,8 @@
                             <div class="bg-surface-border/30 rounded-lg p-3 mb-2">
                                 <div class="flex items-center justify-between">
                                     <div>
-                                        <p class="text-white text-sm">${date}</p>
-                                        <p class="text-text-muted text-xs">${test.interpretation || 'No interpretation'}</p>
+                                        <p class="text-white text-sm">${escapeHtml(date)}</p>
+                                        <p class="text-text-muted text-xs">${escapeHtml(test.interpretation || 'No interpretation')}</p>
                                     </div>
                                     ${test.pdf_report_path ? `
                                         <button onclick="openPDF('${test.pdf_report_path.replace(/\\/g, '\\\\')}')"
