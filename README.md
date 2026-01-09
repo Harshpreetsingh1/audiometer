@@ -134,9 +134,7 @@ Test results are saved to:
 audiometer/results/[PatientName]_[DateTime].csv
 ```
 
-## License
 
-MIT License - See [LICENSE](LICENSE) for details.
 
 ## Contributing
 
