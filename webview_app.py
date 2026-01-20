@@ -14,6 +14,7 @@ import sys
 import time
 import json
 import re
+from datetime import datetime
 from typing import Optional, Dict, Any, List
 
 # Add parent directory to path for imports
@@ -22,11 +23,45 @@ sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import sounddevice as sd
 from ascending_method import AscendingMethod
 
+# Import new feature modules
+from patient_database import PatientDatabase
+from interpretation_engine import InterpretationEngine
+try:
+    from pdf_report_generator import PDFReportGenerator, HAS_REPORTLAB
+except ImportError:
+    HAS_REPORTLAB = False
+    PDFReportGenerator = None
+
+from audiogram_visualizer import AudiogramPlotter
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
     format='%(levelname)s: %(message)s'
 )
+
+
+def resource_path(relative_path: str) -> str:
+    """
+    Get absolute path to resource, works for both development and PyInstaller.
+    
+    When running as a PyInstaller executable, assets are extracted to a
+    temporary folder referenced by sys._MEIPASS. In development, we use
+    the script's directory as the base path.
+    
+    Args:
+        relative_path: Path relative to the application root.
+        
+    Returns:
+        Absolute path to the resource.
+    """
+    if getattr(sys, 'frozen', False):
+        # Running as compiled executable (PyInstaller)
+        base_path = sys._MEIPASS
+    else:
+        # Running in normal Python environment
+        base_path = os.path.dirname(os.path.abspath(__file__))
+    return os.path.join(base_path, relative_path)
 
 
 class AudiometerAPI:
@@ -56,6 +91,16 @@ class AudiometerAPI:
         
         # Task 4: Storage for test results (for CSV export)
         self.test_results: Dict[str, Dict[int, float]] = {'left': {}, 'right': {}}
+        
+        # Patient data storage
+        self.patient_data: Dict[str, Any] = {}
+        self.current_patient_id: Optional[int] = None
+        self.current_csv_path: Optional[str] = None
+        self.current_audiogram_path: Optional[str] = None
+        
+        # Initialize database and interpretation engine
+        self._init_database()
+        self.interpretation_engine = InterpretationEngine()
     
     def set_window(self, window: webview.Window):
         """Set the webview window reference for JS calls."""
@@ -403,6 +448,311 @@ class AudiometerAPI:
             return {'success': False}
     
     # ============================================================
+    # Database Management
+    # ============================================================
+    
+    def _init_database(self):
+        """Initialize the patient database."""
+        try:
+            # Store database in results folder
+            db_dir = resource_path('audiometer/results')
+            os.makedirs(db_dir, exist_ok=True)
+            db_path = os.path.join(db_dir, 'patients.db')
+            self.db = PatientDatabase(db_path)
+            logging.info(f"Patient database initialized: {db_path}")
+        except Exception as e:
+            logging.error(f"Failed to initialize database: {e}")
+            self.db = None
+    
+    def save_patient(self, patient_data: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Save a new patient to the database.
+        
+        Args:
+            patient_data: Dict with name, phone, age, gender, ref_id, referring_physician.
+            
+        Returns:
+            Dict with success status and patient_id.
+        """
+        try:
+            if not self.db:
+                return {'success': False, 'error': 'Database not initialized'}
+            
+            # Validate required fields
+            name = patient_data.get('name')
+            if not name or not str(name).strip():
+                return {'success': False, 'error': 'Patient name is required'}
+            
+            patient_id = self.db.add_patient(
+                name=str(name).strip(),
+                phone=patient_data.get('phone'),
+                age=int(patient_data['age']) if patient_data.get('age') else None,
+                gender=patient_data.get('gender'),
+                ref_id=patient_data.get('id'),
+                referring_physician=patient_data.get('referring_physician')
+            )
+            
+            self.current_patient_id = patient_id
+            self.patient_data = patient_data
+            
+            logging.info(f"Saved patient: {patient_data.get('name')} (ID: {patient_id})")
+            return {'success': True, 'patient_id': patient_id}
+            
+        except Exception as e:
+            logging.error(f"Failed to save patient: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def search_patient(self, query: str) -> Dict[str, Any]:
+        """
+        Search patients by phone number, name, or ID.
+        
+        Args:
+            query: Search string.
+            
+        Returns:
+            Dict with success status and list of matching patients.
+        """
+        try:
+            if not self.db:
+                return {'success': False, 'error': 'Database not initialized'}
+            
+            results = self.db.search_patients(query)
+            return {'success': True, 'patients': results}
+            
+        except Exception as e:
+            logging.error(f"Failed to search patients: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def get_patient_history(self, patient_id: int) -> Dict[str, Any]:
+        """
+        Get all test history for a patient.
+        
+        Args:
+            patient_id: The patient's database ID.
+            
+        Returns:
+            Dict with success status, patient info, and test history.
+        """
+        try:
+            if not self.db:
+                return {'success': False, 'error': 'Database not initialized'}
+            
+            patient = self.db.get_patient_by_id(patient_id)
+            if not patient:
+                return {'success': False, 'error': 'Patient not found'}
+            
+            history = self.db.get_patient_history(patient_id)
+            
+            return {
+                'success': True,
+                'patient': patient,
+                'history': history,
+                'test_count': len(history)
+            }
+            
+        except Exception as e:
+            logging.error(f"Failed to get patient history: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def load_patient(self, patient_id: int) -> Dict[str, Any]:
+        """
+        Load a patient for a new test session.
+        
+        Args:
+            patient_id: The patient's database ID.
+            
+        Returns:
+            Dict with patient data for the form.
+        """
+        try:
+            if not self.db:
+                return {'success': False, 'error': 'Database not initialized'}
+            
+            patient = self.db.get_patient_by_id(patient_id)
+            if not patient:
+                return {'success': False, 'error': 'Patient not found'}
+            
+            self.current_patient_id = patient_id
+            self.patient_data = patient
+            
+            return {'success': True, 'patient': patient}
+            
+        except Exception as e:
+            logging.error(f"Failed to load patient: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    # ============================================================
+    # Smart Interpretation
+    # ============================================================
+    
+    def get_interpretation(self) -> Dict[str, Any]:
+        """
+        Get AI interpretation of current test results.
+        
+        Returns:
+            Dict with interpretation data including remarks and recommendations.
+        """
+        try:
+            with self.lock:
+                left_ear = dict(self.test_results.get('left', {}))
+                right_ear = dict(self.test_results.get('right', {}))
+            
+            if not left_ear and not right_ear:
+                return {'success': False, 'error': 'No test results available'}
+            
+            # Get patient age for age-related interpretation
+            patient_age = None
+            if self.patient_data.get('age'):
+                try:
+                    patient_age = int(self.patient_data['age'])
+                except (ValueError, TypeError):
+                    pass
+            
+            result = self.interpretation_engine.analyze(
+                left_ear=left_ear,
+                right_ear=right_ear,
+                patient_age=patient_age
+            )
+            
+            return {'success': True, 'interpretation': result}
+            
+        except Exception as e:
+            logging.error(f"Failed to get interpretation: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    # ============================================================
+    # PDF Report Generation
+    # ============================================================
+    
+    def generate_pdf_report(self, doctor_name: str = "", remarks: str = "") -> Dict[str, Any]:
+        """
+        Generate a PDF report for the current test.
+        
+        Args:
+            doctor_name: Name of the examining doctor.
+            remarks: Additional doctor remarks.
+            
+        Returns:
+            Dict with success status and path to generated PDF.
+        """
+        try:
+            if not HAS_REPORTLAB:
+                return {'success': False, 'error': 'ReportLab not installed. Run: pip install reportlab'}
+            
+            with self.lock:
+                left_ear = dict(self.test_results.get('left', {}))
+                right_ear = dict(self.test_results.get('right', {}))
+            
+            if not left_ear and not right_ear:
+                return {'success': False, 'error': 'No test results available'}
+            
+            # Get interpretation
+            interpretation = self.interpretation_engine.analyze(left_ear, right_ear)
+            
+            # Generate audiogram image if not available
+            audiogram_path = self.current_audiogram_path
+            if not audiogram_path or not os.path.exists(audiogram_path):
+                # Generate from CSV if available
+                if self.current_csv_path and os.path.exists(self.current_csv_path):
+                    try:
+                        plotter = AudiogramPlotter(self.current_csv_path)
+                        audiogram_path = self.current_csv_path.replace('.csv', '_audiogram.png')
+                        plotter.plot_audiogram(audiogram_path)
+                        plotter.close()
+                        self.current_audiogram_path = audiogram_path
+                    except Exception as e:
+                        logging.warning(f"Failed to generate audiogram: {e}")
+                        audiogram_path = None
+            
+            # Prepare output path
+            patient_name = self.patient_data.get('name', 'Unknown')
+            safe_name = self._sanitize_filename(patient_name)
+            timestamp = datetime.now().strftime('%Y%m%d_%H%M%S')
+            
+            output_dir = resource_path('audiometer/results')
+            os.makedirs(output_dir, exist_ok=True)
+            output_path = os.path.join(output_dir, f"{safe_name}_report_{timestamp}.pdf")
+            
+            # Generate PDF
+            generator = PDFReportGenerator(
+                patient_data=self.patient_data,
+                test_results={'left': left_ear, 'right': right_ear},
+                interpretation=interpretation,
+                audiogram_path=audiogram_path,
+                doctor_name=doctor_name,
+                remarks=remarks
+            )
+            
+            pdf_path = generator.generate_report(output_path)
+            
+            # Save test results to database
+            if self.db and self.current_patient_id:
+                try:
+                    test_id = self.db.save_test_result(
+                        patient_id=self.current_patient_id,
+                        left_ear_data=left_ear,
+                        right_ear_data=right_ear,
+                        interpretation=interpretation.get('summary', ''),
+                        remarks=remarks,
+                        csv_path=self.current_csv_path,
+                        audiogram_path=audiogram_path,
+                        pdf_report_path=pdf_path,
+                        test_mode='quick'  # TODO: get from test config
+                    )
+                    logging.info(f"Test result saved to database (ID: {test_id})")
+                except Exception as e:
+                    logging.error(f"Failed to save test to database: {e}")
+            
+            logging.info(f"PDF report generated: {pdf_path}")
+            return {'success': True, 'pdf_path': pdf_path}
+            
+        except Exception as e:
+            logging.error(f"Failed to generate PDF: {e}")
+            import traceback
+            traceback.print_exc()
+            return {'success': False, 'error': str(e)}
+    
+    def open_pdf(self, pdf_path: str) -> Dict[str, Any]:
+        """
+        Open a PDF file with the default system viewer.
+        
+        Args:
+            pdf_path: Path to the PDF file.
+            
+        Returns:
+            Dict with success status.
+        """
+        try:
+            if not os.path.exists(pdf_path):
+                return {'success': False, 'error': 'PDF file not found'}
+            
+            if sys.platform == 'win32':
+                os.startfile(pdf_path)
+            elif sys.platform == 'darwin':
+                os.system(f'open "{pdf_path}"')
+            else:
+                os.system(f'xdg-open "{pdf_path}"')
+            
+            return {'success': True}
+            
+        except Exception as e:
+            logging.error(f"Failed to open PDF: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    def get_database_stats(self) -> Dict[str, Any]:
+        """Get database statistics for display."""
+        try:
+            if not self.db:
+                return {'success': False, 'error': 'Database not initialized'}
+            
+            stats = self.db.get_statistics()
+            return {'success': True, 'stats': stats}
+            
+        except Exception as e:
+            logging.error(f"Failed to get database stats: {e}")
+            return {'success': False, 'error': str(e)}
+    
+    # ============================================================
     # Callbacks from Test Engine
     # ============================================================
     
@@ -441,29 +791,6 @@ class AudiometerAPI:
                 self.window.evaluate_js(f'window.updateFromPython({js_data})')
             except Exception as e:
                 logging.debug(f"Failed to push update to JS: {e}")
-
-
-def resource_path(relative_path: str) -> str:
-    """
-    Get absolute path to resource, works for both development and PyInstaller.
-    
-    When running as a PyInstaller executable, assets are extracted to a
-    temporary folder referenced by sys._MEIPASS. In development, we use
-    the script's directory as the base path.
-    
-    Args:
-        relative_path: Path relative to the application root.
-        
-    Returns:
-        Absolute path to the resource.
-    """
-    if getattr(sys, 'frozen', False):
-        # Running as compiled executable (PyInstaller)
-        base_path = sys._MEIPASS
-    else:
-        # Running in normal Python environment
-        base_path = os.path.dirname(os.path.abspath(__file__))
-    return os.path.join(base_path, relative_path)
 
 
 def get_html_path() -> str:

@@ -8,7 +8,8 @@
     <!-- Fonts -->
     <link href="https://fonts.googleapis.com" rel="preconnect" />
     <link crossorigin="" href="https://fonts.gstatic.com" rel="preconnect" />
-    <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;700&display=swap"
+    <link
+        href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500;700&display=swap"
         rel="stylesheet" />
     <link href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"
         rel="stylesheet" />
@@ -21,25 +22,30 @@
             theme: {
                 extend: {
                     colors: {
-                        "primary": "#13ec5b",
-                        "primary-dim": "#0f7a35",
-                        "background-light": "#f6f8f6",
-                        "background-dark": "#050a07",
-                        "surface-dark": "#0e1a13",
-                        "surface-glass": "rgba(20, 30, 25, 0.7)",
-                        "accent-red": "#ff3b30",
-                        "accent-blue": "#007aff",
-                        "accent-yellow": "#ffcc00",
+                        "primary": "#1A5CFF",
+                        "primary-hover": "#3D75FF",
+                        "background-dark": "#05080F",
+                        "background-darker": "#0B101A",
+                        "surface-dark": "#121826",
+                        "surface-border": "#1F2937",
+                        "accent-red": "#EF4444",
+                        "accent-green": "#22C55E",
+                        "accent-yellow": "#FBBF24",
+                        "accent-blue": "#3B82F6",
+                        "text-primary": "#FFFFFF",
+                        "text-secondary": "#9CA3AF",
+                        "text-muted": "#6B7280",
                     },
                     fontFamily: {
-                        "display": ["Space Grotesk", "sans-serif"],
-                        "body": ["Space Grotesk", "sans-serif"]
+                        "sans": ["Inter", "sans-serif"],
+                        "mono": ["JetBrains Mono", "monospace"]
                     },
                     boxShadow: {
-                        'neon': '0 0 10px rgba(19, 236, 91, 0.3), 0 0 20px rgba(19, 236, 91, 0.1)',
-                        'neon-red': '0 0 10px rgba(255, 59, 48, 0.3), 0 0 20px rgba(255, 59, 48, 0.1)',
-                        'glow': '0 0 15px rgba(19, 236, 91, 0.5)',
-                        'response': '0 0 30px rgba(255, 204, 0, 0.6), inset 0 0 20px rgba(255, 204, 0, 0.8)',
+                        'glow-blue': '0 0 20px rgba(26, 92, 255, 0.3)',
+                        'glow-red': '0 0 20px rgba(239, 68, 68, 0.3)',
+                        'glow-green': '0 0 20px rgba(34, 197, 94, 0.3)',
+                        'glow-yellow': '0 0 30px rgba(251, 191, 36, 0.6)',
+                        'card': '0 4px 24px rgba(0, 0, 0, 0.4)',
                     }
                 },
             },
@@ -47,72 +53,39 @@
     </script>
     <style>
         body {
-            font-family: "Space Grotesk", sans-serif;
+            font-family: "Inter", sans-serif;
             user-select: none;
+            background: linear-gradient(180deg, #05080F 0%, #0B101A 100%);
         }
 
         .glass-panel {
-            background: rgba(20, 30, 25, 0.6);
-            backdrop-filter: blur(12px);
-            -webkit-backdrop-filter: blur(12px);
-            border: 1px solid rgba(255, 255, 255, 0.08);
+            background: #121826;
+            border: 1px solid #1F2937;
         }
 
         .meter-track {
-            stroke: #1c2e23;
+            stroke: #1F2937;
         }
 
-        .meter-fill-primary {
-            stroke: #13ec5b;
+        .meter-fill-blue {
+            stroke: #3B82F6;
             transition: stroke-dashoffset 0.5s ease;
         }
 
-        .meter-fill-secondary {
-            stroke: #13ec5b;
-            opacity: 0.7;
+        .meter-fill-green {
+            stroke: #22C55E;
             transition: stroke-dashoffset 0.5s ease;
-        }
-
-        .bg-tech-grid {
-            background-size: 40px 40px;
-            background-image:
-                linear-gradient(to right, rgba(19, 236, 91, 0.03) 1px, transparent 1px),
-                linear-gradient(to bottom, rgba(19, 236, 91, 0.03) 1px, transparent 1px);
         }
 
         /* Ear indicator colors */
-        .ear-left .ear-left-path {
-            stroke: #007aff !important;
-            filter: drop-shadow(0 0 8px rgba(0, 122, 255, 0.8));
+        .ear-left .indicator-left {
+            color: #3B82F6 !important;
+            filter: drop-shadow(0 0 8px rgba(59, 130, 246, 0.8));
         }
 
-        .ear-left .ear-left-dot {
-            fill: #007aff !important;
-        }
-
-        .ear-left .ear-right-path {
-            stroke: #3a1a1a !important;
-            filter: none;
-        }
-
-        .ear-right .ear-right-path {
-            stroke: #ff3b30 !important;
-            filter: drop-shadow(0 0 8px rgba(255, 59, 48, 0.8));
-        }
-
-        .ear-right .ear-right-dot {
-            fill: #ff3b30 !important;
-        }
-
-        .ear-right .ear-left-path {
-            stroke: #1a2a3a !important;
-            filter: none;
-        }
-
-        .ear-none .ear-left-path,
-        .ear-none .ear-right-path {
-            stroke: #2a3f33 !important;
-            filter: none;
+        .ear-right .indicator-right {
+            color: #EF4444 !important;
+            filter: drop-shadow(0 0 8px rgba(239, 68, 68, 0.8));
         }
 
         /* Signal LED active state */
@@ -121,8 +94,8 @@
         }
 
         .signal-btn.active .signal-bulb {
-            background-color: #ffcc00 !important;
-            box-shadow: 0 0 30px rgba(255, 204, 0, 0.6), inset 0 0 20px rgba(255, 204, 0, 0.8) !important;
+            background-color: #FBBF24 !important;
+            box-shadow: 0 0 30px rgba(251, 191, 36, 0.6), inset 0 0 20px rgba(251, 191, 36, 0.8) !important;
         }
 
         .signal-btn.active .signal-icon {
@@ -142,23 +115,66 @@
 
         /* Device dropdown */
         select {
-            background-color: #0e1a13;
+            background-color: #1F2937;
             color: white;
-            border: 1px solid rgba(255, 255, 255, 0.1);
+            border: 1px solid #374151;
         }
 
         select:focus {
             outline: none;
-            border-color: #13ec5b;
+            border-color: #1A5CFF;
+        }
+
+        /* Custom scrollbar */
+        ::-webkit-scrollbar {
+            width: 6px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #121826;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #374151;
+            border-radius: 3px;
+        }
+
+        /* Animation for clock */
+        @keyframes pulse-slow {
+
+            0%,
+            100% {
+                opacity: 1;
+            }
+
+            50% {
+                opacity: 0.5;
+            }
+        }
+
+        .clock-separator {
+            animation: pulse-slow 1s ease-in-out infinite;
+        }
+
+        /* Radio button styling */
+        input[type="radio"] {
+            accent-color: #1A5CFF;
+        }
+
+        /* Input styling */
+        input:focus {
+            outline: none;
+            border-color: #1A5CFF;
         }
     </style>
 </head>
 
-<body
-    class="bg-background-dark text-white min-h-screen flex flex-col overflow-x-hidden selection:bg-primary selection:text-black test-stopped">
+<body class="bg-background-dark text-white min-h-screen flex flex-col overflow-x-hidden test-stopped">
 
-    <!-- Top Bar -->
-    <header class="flex items-center justify-between px-5 py-4 bg-background-dark border-b border-white/5 z-20">
+    <!-- ============================================================ -->
+    <!-- HEADER BAR (Shared across all views) -->
+    <!-- ============================================================ -->
+    <header class="flex items-center justify-between px-5 py-4 bg-background-dark border-b border-surface-border z-20">
         <div class="flex items-center gap-3">
             <div
                 class="flex items-center justify-center size-10 rounded-xl bg-primary/10 text-primary border border-primary/20">
@@ -166,247 +182,684 @@
             </div>
             <div>
                 <h1 class="text-lg font-bold leading-none tracking-tight">Audiometer Pro</h1>
-                <div class="flex items-center gap-1.5 mt-1">
-                    <span class="relative flex h-2 w-2" id="connection-indicator">
-                        <span
-                            class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                        <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-                    </span>
-                    <span class="text-xs text-white/50 font-medium tracking-widest uppercase"
-                        id="connection-status">Ready</span>
-                </div>
+                <p class="text-[10px] text-text-muted font-medium tracking-widest uppercase mt-0.5">Clinical Interface
+                    V2.4</p>
             </div>
         </div>
-        <button
-            class="size-10 flex items-center justify-center rounded-full text-white/70 hover:bg-white/5 hover:text-white transition-colors"
-            onclick="toggleConfig()">
-            <span class="material-symbols-outlined">settings</span>
-        </button>
+        <div class="flex items-center gap-3">
+            <div class="flex items-center gap-2 px-3 py-1.5 rounded-full bg-accent-green/10 border border-accent-green/30"
+                id="connection-status-badge">
+                <span class="relative flex h-2 w-2">
+                    <span
+                        class="animate-ping absolute inline-flex h-full w-full rounded-full bg-accent-green opacity-75"></span>
+                    <span class="relative inline-flex rounded-full h-2 w-2 bg-accent-green"></span>
+                </span>
+                <span class="text-xs text-accent-green font-medium">SYSTEM CONNECTED</span>
+            </div>
+            <button
+                class="size-9 flex items-center justify-center rounded-full text-text-secondary hover:bg-surface-dark hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-xl">settings</span>
+            </button>
+            <button
+                class="size-9 flex items-center justify-center rounded-full text-text-secondary hover:bg-surface-dark hover:text-white transition-colors">
+                <span class="material-symbols-outlined text-xl">help</span>
+            </button>
+            <div class="size-9 flex items-center justify-center rounded-full bg-primary text-white font-bold text-sm">
+                DR
+            </div>
+        </div>
     </header>
 
-    <main class="flex-1 flex flex-col relative bg-tech-grid p-4 gap-4 overflow-y-auto">
-
-        <!-- Patient Info Card -->
-        <section class="glass-panel rounded-2xl p-4 flex items-center justify-between shadow-lg">
-            <div class="flex items-center gap-4">
-                <div
-                    class="size-12 rounded-full bg-surface-dark border border-white/10 overflow-hidden relative flex-shrink-0 flex items-center justify-center">
-                    <span class="material-symbols-outlined text-white/30 text-2xl">person</span>
-                </div>
-                <div>
-                    <div class="flex items-center gap-2 mb-0.5">
-                        <input type="text" id="patient-name" placeholder="Patient Name"
-                            class="text-white font-bold text-lg leading-tight bg-transparent border-b border-white/20 focus:border-primary focus:outline-none w-40"
-                            value="">
-                        <input type="text" id="patient-id" placeholder="ID"
-                            class="px-1.5 py-0.5 rounded text-[10px] font-bold bg-white/10 text-white/60 tracking-wider w-16 text-center border border-transparent focus:border-primary focus:outline-none"
-                            value="">
-                    </div>
-                    <div class="flex items-center gap-2">
-                        <span class="text-primary text-sm font-medium">Age:</span>
-                        <input type="number" id="patient-age" placeholder="--"
-                            class="text-primary text-sm font-medium bg-transparent border-b border-white/20 focus:border-primary focus:outline-none w-12 text-center"
-                            value="">
-                    </div>
-                </div>
-            </div>
-            <div class="text-right">
-                <p class="text-white/40 text-xs font-medium uppercase tracking-wider mb-1" id="time-label">Time</p>
-                <p class="text-xl font-display font-bold tabular-nums tracking-tight" id="current-time">--:--</p>
-                <p class="text-xs text-primary font-medium mt-1 hidden" id="test-duration">Duration: 00:00</p>
-            </div>
-        </section>
-
-        <!-- Main Stage: Live Monitor -->
-        <section
-            class="flex-1 min-h-[400px] rounded-3xl bg-[#08100c] border border-white/5 relative overflow-hidden flex flex-col p-2 shadow-inner ear-none"
-            id="monitor-stage">
-
-            <!-- Decorative corner markers -->
-            <div class="absolute top-4 left-4 w-4 h-4 border-l-2 border-t-2 border-primary/30 rounded-tl-lg"></div>
-            <div class="absolute top-4 right-4 w-4 h-4 border-r-2 border-t-2 border-primary/30 rounded-tr-lg"></div>
-            <div class="absolute bottom-4 left-4 w-4 h-4 border-l-2 border-b-2 border-primary/30 rounded-bl-lg"></div>
-            <div class="absolute bottom-4 right-4 w-4 h-4 border-r-2 border-b-2 border-primary/30 rounded-br-lg"></div>
-
-            <!-- Visualization Container -->
-            <div class="flex-1 flex flex-col items-center justify-center relative z-10 py-6">
-
-                <!-- Ear/Head Visual -->
-                <div class="relative w-64 h-64 flex items-center justify-center mb-6">
-                    <svg class="w-full h-full drop-shadow-2xl" viewbox="0 0 200 200">
-                        <!-- Head Shape -->
-                        <path
-                            d="M100 40 C 70 40 45 65 45 100 C 45 140 70 170 100 175 C 130 170 155 140 155 100 C 155 65 130 40 100 40 Z"
-                            fill="none" stroke="#2a3f33" stroke-width="2"></path>
-                        <!-- Left Ear -->
-                        <path class="ear-left-path" d="M35 90 C 25 90 20 100 20 110 C 20 125 35 135 45 130" fill="none"
-                            stroke="#2a3f33" stroke-linecap="round" stroke-width="4"></path>
-                        <circle class="ear-left-dot animate-pulse" cx="35" cy="110" fill="#2a3f33" r="4"></circle>
-                        <!-- Right Ear -->
-                        <path class="ear-right-path" d="M165 90 C 175 90 180 100 180 110 C 180 125 165 135 155 130"
-                            fill="none" stroke="#2a3f33" stroke-linecap="round" stroke-width="4"></path>
-                        <circle class="ear-right-dot animate-pulse hidden" cx="165" cy="110" fill="#2a3f33" r="4">
-                        </circle>
-                        <!-- Headphone band -->
-                        <path d="M35 90 C 35 30 165 30 165 90" fill="none" stroke="#2a3f33" stroke-dasharray="4 4"
-                            stroke-width="2"></path>
-                    </svg>
-
-                    <!-- Digital Readout Overlay -->
-                    <div class="absolute inset-0 flex items-center justify-center">
-                        <div
-                            class="text-center bg-background-dark/80 backdrop-blur-sm p-3 rounded-xl border border-white/5">
-                            <span class="block text-white/50 text-xs font-bold uppercase tracking-widest mb-1"
-                                id="ear-label">Ready</span>
-                            <span class="material-symbols-outlined text-white/30 text-3xl" id="ear-icon">hearing</span>
-                        </div>
-                    </div>
-                </div>
-
-                <!-- Prominent Ear Badge -->
-                <div id="ear-badge"
-                    class="hidden absolute top-4 left-1/2 transform -translate-x-1/2 px-6 py-2 rounded-full font-bold text-lg uppercase tracking-wider shadow-lg z-30">
-                    <span id="ear-badge-text">READY</span>
-                </div>
-
-                <!-- Meters Row -->
-                <div class="w-full grid grid-cols-2 gap-4 px-4">
-                    <!-- Frequency Meter -->
-                    <div class="flex flex-col items-center">
-                        <div class="relative size-32">
-                            <svg class="size-full -rotate-90 transform" viewbox="0 0 100 100">
-                                <circle class="meter-track" cx="50" cy="50" fill="none" r="45" stroke-width="8">
-                                </circle>
-                                <circle class="meter-fill-primary" id="freq-meter-fill" cx="50" cy="50" fill="none"
-                                    r="45" stroke-dasharray="283" stroke-dashoffset="283" stroke-width="8"></circle>
-                            </svg>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span class="text-2xl font-bold text-white tracking-tight" id="freq-value">--</span>
-                                <span class="text-xs font-medium text-white/50 uppercase">Hz</span>
-                            </div>
-                        </div>
-                        <span class="mt-2 text-sm font-medium text-primary tracking-wide">Frequency</span>
-                    </div>
-
-                    <!-- Level Meter -->
-                    <div class="flex flex-col items-center">
-                        <div class="relative size-32">
-                            <svg class="size-full -rotate-90 transform" viewbox="0 0 100 100">
-                                <circle class="meter-track" cx="50" cy="50" fill="none" r="45" stroke-width="8">
-                                </circle>
-                                <circle class="meter-fill-secondary" id="level-meter-fill" cx="50" cy="50" fill="none"
-                                    r="45" stroke-dasharray="283" stroke-dashoffset="283" stroke-width="8"></circle>
-                            </svg>
-                            <div class="absolute inset-0 flex flex-col items-center justify-center">
-                                <span class="text-2xl font-bold text-white tracking-tight" id="level-value">--</span>
-                                <span class="text-xs font-medium text-white/50 uppercase">dBHL</span>
-                            </div>
-                        </div>
-                        <span class="mt-2 text-sm font-medium text-primary tracking-wide">Level</span>
-                    </div>
-                </div>
+    <!-- ============================================================ -->
+    <!-- VIEW 1: INTRO SCREEN -->
+    <!-- ============================================================ -->
+    <div id="view-intro" class="flex-1 flex">
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-background-dark border-r border-surface-border p-5 flex flex-col">
+            <!-- Clock -->
+            <div class="mb-8">
+                <div class="font-mono text-4xl font-bold tracking-tight" id="intro-clock">14:32:05</div>
+                <p class="text-xs text-accent-green font-medium uppercase tracking-wider mt-1">Session Time</p>
             </div>
 
-            <!-- Virtual LED Response Button -->
-            <div class="absolute bottom-6 left-1/2 transform -translate-x-1/2 z-20">
-                <button class="relative signal-btn" id="signal-button" onmousedown="onPatientResponse(true)"
-                    onmouseup="onPatientResponse(false)" ontouchstart="onPatientResponse(true)"
-                    ontouchend="onPatientResponse(false)">
-                    <div
-                        class="signal-glow absolute inset-0 bg-accent-yellow rounded-full blur-xl opacity-0 transition-opacity duration-200">
-                    </div>
-                    <div
-                        class="signal-bulb relative size-16 rounded-full bg-surface-dark border-4 border-[#333] shadow-inner flex items-center justify-center overflow-hidden transition-colors duration-100">
-                        <span
-                            class="signal-icon material-symbols-outlined text-white/20 text-3xl transition-colors">lightbulb</span>
-                    </div>
-                    <span
-                        class="absolute -bottom-6 w-full text-center text-[10px] text-white/40 font-bold uppercase tracking-wider">I
-                        Hear It</span>
+            <!-- Patient Data Placeholder -->
+            <div class="glass-panel rounded-xl p-4 flex-1">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-text-muted text-lg">person</span>
+                    <span class="text-xs text-text-secondary font-semibold uppercase tracking-wider">Patient Data</span>
+                </div>
+                <div class="text-text-muted text-sm">No patient loaded</div>
+            </div>
+        </aside>
+
+        <!-- Main Content -->
+        <main class="flex-1 flex flex-col items-center justify-center p-8">
+            <h2 class="text-5xl font-light text-white mb-12 tracking-tight">Welcome to Audiometer Pro</h2>
+
+            <div class="flex gap-4">
+                <button onclick="switchToView('view-registration')"
+                    class="flex items-center gap-3 px-8 py-4 bg-primary hover:bg-primary-hover text-white font-semibold text-lg rounded-lg shadow-glow-blue transition-all">
+                    <span class="material-symbols-outlined">person_add</span>
+                    START NEW PATIENT
+                </button>
+                <button onclick="openPatientSearch()"
+                    class="flex items-center gap-3 px-8 py-4 bg-surface-dark hover:bg-surface-border text-white font-semibold text-lg rounded-lg border border-surface-border transition-all">
+                    <span class="material-symbols-outlined">history</span>
+                    VIEW PATIENT HISTORY
                 </button>
             </div>
-        </section>
+        </main>
+    </div>
 
-        <!-- Progress Bar -->
-        <div class="w-full glass-panel rounded-xl p-3">
-            <div class="flex justify-between items-end mb-2">
-                <span class="text-xs font-bold text-white/70 uppercase tracking-widest">Test Progress</span>
-                <span class="text-sm font-bold text-primary font-display" id="progress-text">0%</span>
+    <!-- ============================================================ -->
+    <!-- VIEW 2: PATIENT REGISTRATION -->
+    <!-- ============================================================ -->
+    <div id="view-registration" class="flex-1 flex hidden">
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-background-dark border-r border-surface-border p-5 flex flex-col">
+            <!-- Clock -->
+            <div class="mb-8">
+                <div class="font-mono text-4xl font-bold tracking-tight" id="reg-clock">14:32:05</div>
+                <p class="text-xs text-accent-green font-medium uppercase tracking-wider mt-1">Session Time</p>
             </div>
-            <div class="h-4 w-full bg-[#1c2e23] rounded-sm relative overflow-hidden">
-                <div class="absolute inset-0 w-full h-full"
-                    style="background-image: linear-gradient(90deg, transparent 95%, rgba(0,0,0,0.4) 95%); background-size: 10% 100%; z-index: 2;">
+
+            <!-- Patient Data Preview -->
+            <div class="glass-panel rounded-xl p-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-text-muted text-lg">person</span>
+                        <span class="text-xs text-text-secondary font-semibold uppercase tracking-wider">Patient
+                            Data</span>
+                    </div>
+                    <span class="text-xs text-primary cursor-pointer hover:underline">Edit</span>
                 </div>
-                <div class="h-full bg-primary relative shadow-[0_0_10px_#13ec5b] transition-all duration-300"
-                    id="progress-fill" style="width: 0%;">
-                    <div class="absolute right-0 top-0 bottom-0 w-0.5 bg-white opacity-50"></div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] text-text-muted uppercase tracking-wider">Full Name</label>
+                        <div class="mt-1 px-3 py-2 bg-surface-border/50 rounded-lg flex items-center gap-2">
+                            <span class="material-symbols-outlined text-text-muted text-sm">badge</span>
+                            <span class="text-sm text-white" id="sidebar-preview-name">John Doe</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-text-muted uppercase tracking-wider">ID Ref</label>
+                            <div class="mt-1 px-2 py-2 bg-surface-border/50 rounded-lg text-sm text-white"
+                                id="sidebar-preview-id">#8842-AX</div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-text-muted uppercase tracking-wider">DOB</label>
+                            <div class="mt-1 px-2 py-2 bg-surface-border/50 rounded-lg text-sm text-white">12/05/85
+                            </div>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
+        </aside>
 
-        <!-- Control Panel -->
-        <div class="grid grid-cols-2 gap-4">
-            <button
-                class="start-btn flex items-center justify-center gap-2 h-14 rounded-xl bg-primary text-black font-bold text-base shadow-neon hover:bg-[#34f374] active:scale-[0.98] transition-all"
-                onclick="startTest()">
-                <span class="material-symbols-outlined">play_arrow</span>
-                START TEST
-            </button>
-            <button
-                class="stop-btn flex items-center justify-center gap-2 h-14 rounded-xl bg-transparent border-2 border-accent-red text-accent-red font-bold text-base hover:bg-accent-red/10 hover:shadow-neon-red active:scale-[0.98] transition-all"
-                onclick="stopTest()">
-                <span class="material-symbols-outlined">stop_circle</span>
-                STOP
-            </button>
-        </div>
+        <!-- Main Content - Registration Form -->
+        <main class="flex-1 flex items-center justify-center p-8">
+            <div class="w-full max-w-lg">
+                <h2 class="text-4xl font-light text-white mb-8">New Patient Registration</h2>
 
-        <!-- Device Configuration Panel -->
-        <div class="w-full" id="config-panel">
-            <div class="glass-panel rounded-xl p-4 space-y-4">
-                <div class="flex items-center gap-3 mb-4">
-                    <span class="material-symbols-outlined text-white/50">tune</span>
-                    <span class="text-white/80 font-medium text-sm">Device Configuration</span>
-                </div>
+                <form id="registration-form" class="space-y-5">
+                    <!-- Full Name -->
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">Full Name</label>
+                        <input type="text" id="input-name" placeholder="Enter patient's full name"
+                            class="w-full h-12 px-4 bg-surface-dark border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors">
+                    </div>
 
-                <!-- Device Selection -->
-                <div>
-                    <label class="block text-xs text-white/50 uppercase tracking-wider mb-2">Audio Output Device</label>
-                    <div class="flex gap-2">
-                        <select id="device-select" class="flex-1 h-10 px-3 rounded-lg text-sm">
+                    <!-- ID Ref and Phone -->
+                    <div class="grid grid-cols-2 gap-4">
+                        <div>
+                            <label class="block text-sm text-text-secondary mb-2">ID Ref</label>
+                            <input type="text" id="input-id" placeholder="e.g., #8842-AX"
+                                class="w-full h-12 px-4 bg-surface-dark border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors">
+                        </div>
+                        <div>
+                            <label class="block text-sm text-text-secondary mb-2">Phone Number</label>
+                            <input type="tel" id="input-phone" placeholder="e.g., 9876543210"
+                                class="w-full h-12 px-4 bg-surface-dark border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors">
+                        </div>
+                    </div>
+
+                    <!-- Age -->
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">Age</label>
+                        <input type="number" id="input-age" placeholder="Age" min="1" max="150"
+                            class="w-full h-12 px-4 bg-surface-dark border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors">
+                    </div>
+
+                    <!-- Gender -->
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-3">Gender</label>
+                        <div class="flex gap-6">
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="gender" value="male" checked class="w-4 h-4">
+                                <span class="text-white">Male</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="gender" value="female" class="w-4 h-4">
+                                <span class="text-white">Female</span>
+                            </label>
+                            <label class="flex items-center gap-2 cursor-pointer">
+                                <input type="radio" name="gender" value="other" class="w-4 h-4">
+                                <span class="text-white">Other</span>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Referring Physician -->
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">Referring Physician</label>
+                        <input type="text" id="input-physician" placeholder="Optional"
+                            class="w-full h-12 px-4 bg-surface-dark border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors">
+                    </div>
+
+                    <!-- Device Selection -->
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-2">Audio Output Device</label>
+                        <select id="device-select" class="w-full h-12 px-4 rounded-lg">
                             <option value="">Loading devices...</option>
                         </select>
-                        <button
-                            class="size-10 flex items-center justify-center rounded-lg bg-white/5 hover:bg-white/10 transition-colors"
-                            onclick="refreshDevices()">
-                            <span class="material-symbols-outlined text-white/50">refresh</span>
+                    </div>
+
+                    <!-- Test Mode -->
+                    <div>
+                        <label class="block text-sm text-text-secondary mb-3">Test Mode</label>
+                        <div class="grid grid-cols-2 gap-3">
+                            <label
+                                class="flex items-center gap-3 p-4 rounded-lg bg-surface-dark border border-surface-border cursor-pointer hover:border-primary/50 transition-colors">
+                                <input type="radio" name="test-mode" value="quick" checked class="w-4 h-4">
+                                <div>
+                                    <span class="text-sm font-medium text-white">Quick Mode</span>
+                                    <span class="block text-xs text-text-muted">4 frequencies</span>
+                                </div>
+                            </label>
+                            <label
+                                class="flex items-center gap-3 p-4 rounded-lg bg-surface-dark border border-surface-border cursor-pointer hover:border-primary/50 transition-colors">
+                                <input type="radio" name="test-mode" value="mini" class="w-4 h-4">
+                                <div>
+                                    <span class="text-sm font-medium text-white">Mini Mode</span>
+                                    <span class="block text-xs text-text-muted">2 frequencies</span>
+                                </div>
+                            </label>
+                        </div>
+                    </div>
+
+                    <!-- Actions -->
+                    <div class="flex gap-4 pt-4">
+                        <button type="button" onclick="saveAndContinue()"
+                            class="flex-1 flex items-center justify-center gap-2 h-14 bg-accent-green hover:bg-accent-green/90 text-white font-bold text-base rounded-lg shadow-glow-green transition-all">
+                            <span class="material-symbols-outlined">check_circle</span>
+                            SAVE & CONTINUE
                         </button>
+                        <button type="button" onclick="switchToView('view-intro')"
+                            class="flex items-center justify-center gap-2 h-14 px-8 bg-surface-dark hover:bg-surface-border text-text-secondary font-bold text-base rounded-lg border border-surface-border transition-all">
+                            CANCEL
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </main>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VIEW 3: TESTING DASHBOARD -->
+    <!-- ============================================================ -->
+    <div id="view-dashboard" class="flex-1 flex hidden">
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-background-dark border-r border-surface-border p-5 flex flex-col overflow-y-auto">
+            <!-- Clock -->
+            <div class="mb-6">
+                <div class="font-mono text-4xl font-bold tracking-tight" id="dashboard-clock">14:32:05</div>
+                <p class="text-xs text-accent-green font-medium uppercase tracking-wider mt-1">Session Time</p>
+                <p class="text-xs text-primary font-medium mt-1 hidden" id="test-duration">Duration: 00:00</p>
+            </div>
+
+            <!-- Patient Data -->
+            <div class="glass-panel rounded-xl p-4 mb-4">
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center gap-2">
+                        <span class="material-symbols-outlined text-text-muted text-lg">person</span>
+                        <span class="text-xs text-text-secondary font-semibold uppercase tracking-wider">Patient
+                            Data</span>
+                    </div>
+                    <span class="text-xs text-primary cursor-pointer hover:underline">Edit</span>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] text-text-muted uppercase tracking-wider">Full Name</label>
+                        <div class="mt-1 px-3 py-2 bg-surface-border/50 rounded-lg flex items-center gap-2">
+                            <span class="material-symbols-outlined text-text-muted text-sm">badge</span>
+                            <span class="text-sm text-white" id="dashboard-patient-name">--</span>
+                        </div>
+                    </div>
+                    <div class="grid grid-cols-2 gap-2">
+                        <div>
+                            <label class="text-[10px] text-text-muted uppercase tracking-wider">ID Ref</label>
+                            <div class="mt-1 px-2 py-2 bg-surface-border/50 rounded-lg text-sm text-white"
+                                id="dashboard-patient-id">--</div>
+                        </div>
+                        <div>
+                            <label class="text-[10px] text-text-muted uppercase tracking-wider">Age</label>
+                            <div class="mt-1 px-2 py-2 bg-surface-border/50 rounded-lg text-sm text-white"
+                                id="dashboard-patient-age">--</div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Device Setup -->
+            <div class="glass-panel rounded-xl p-4 mb-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-text-muted text-lg">tune</span>
+                    <span class="text-xs text-text-secondary font-semibold uppercase tracking-wider">Device Setup</span>
+                </div>
+
+                <div class="space-y-3">
+                    <div>
+                        <label class="text-[10px] text-text-muted uppercase tracking-wider">Transducer (Output)</label>
+                        <div class="mt-1 px-3 py-2 bg-surface-border/50 rounded-lg flex items-center justify-between">
+                            <span class="text-sm text-white truncate" id="dashboard-device-name">DD450 Headphones</span>
+                            <span class="material-symbols-outlined text-text-muted text-sm">expand_more</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-text-muted uppercase tracking-wider">Signal Type (Input)</label>
+                        <div class="mt-1 px-3 py-2 bg-surface-border/50 rounded-lg flex items-center justify-between">
+                            <span class="text-sm text-white">Pure Tone</span>
+                            <span class="material-symbols-outlined text-text-muted text-sm">expand_more</span>
+                        </div>
+                    </div>
+                    <div>
+                        <label class="text-[10px] text-text-muted uppercase tracking-wider">Masking Channel</label>
+                        <label class="mt-2 flex items-center gap-3 cursor-pointer">
+                            <input type="checkbox" class="w-4 h-4 rounded border-surface-border bg-surface-dark">
+                            <span class="text-sm text-white">Enable Masking</span>
+                        </label>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Control Buttons -->
+            <div class="mt-auto space-y-3">
+                <button onclick="startTest()"
+                    class="start-btn w-full flex items-center justify-center gap-2 h-12 bg-primary hover:bg-primary-hover text-white font-bold text-sm rounded-lg shadow-glow-blue transition-all">
+                    <span class="material-symbols-outlined">play_circle</span>
+                    START TEST SEQUENCE
+                </button>
+                <div class="grid grid-cols-2 gap-3">
+                    <button
+                        class="flex items-center justify-center gap-2 h-12 bg-surface-dark hover:bg-surface-border text-white font-bold text-sm rounded-lg border border-surface-border transition-all">
+                        <span class="material-symbols-outlined">pause</span>
+                        PAUSE
+                    </button>
+                    <button onclick="stopTest()"
+                        class="stop-btn flex items-center justify-center gap-2 h-12 bg-transparent hover:bg-accent-red/10 text-accent-red font-bold text-sm rounded-lg border-2 border-accent-red transition-all">
+                        <span class="material-symbols-outlined">stop_circle</span>
+                        STOP
+                    </button>
+                </div>
+            </div>
+        </aside>
+
+        <!-- Main Dashboard Content -->
+        <main class="flex-1 flex flex-col p-6 overflow-y-auto">
+            <!-- Test Progress Bar -->
+            <div class="glass-panel rounded-xl p-4 mb-6">
+                <div class="flex items-center justify-between mb-2">
+                    <div>
+                        <span class="text-xs font-bold text-text-secondary uppercase tracking-widest">Test
+                            Progress</span>
+                        <p class="text-xs text-text-muted mt-0.5" id="current-stage">Current Stage: Waiting to start...
+                        </p>
+                    </div>
+                    <div class="flex items-center gap-6">
+                        <span class="text-sm font-bold text-primary" id="progress-text">0%</span>
+                        <div class="text-right">
+                            <span class="text-xs text-text-muted uppercase">Test Type</span>
+                            <p class="text-sm font-medium text-white">Air Conduction</p>
+                        </div>
+                        <div class="text-right">
+                            <span class="text-xs text-text-muted uppercase">Method</span>
+                            <p class="text-sm font-medium text-white">Hughson-Westlake</p>
+                        </div>
+                    </div>
+                </div>
+                <div class="h-2 w-full bg-surface-border rounded-full overflow-hidden">
+                    <div class="h-full bg-primary transition-all duration-300 rounded-full" id="progress-fill"
+                        style="width: 0%;"></div>
+                </div>
+            </div>
+
+            <!-- Main Gauges Area -->
+            <div class="flex-1 grid grid-cols-3 gap-6">
+                <!-- Frequency Gauge -->
+                <div class="glass-panel rounded-2xl p-6 flex flex-col items-center justify-center">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-accent-blue">graphic_eq</span>
+                        <span class="text-xs font-bold text-text-secondary uppercase tracking-widest">Frequency</span>
+                    </div>
+                    <div class="relative size-40">
+                        <svg class="size-full -rotate-90 transform" viewbox="0 0 100 100">
+                            <circle class="meter-track" cx="50" cy="50" fill="none" r="42" stroke-width="8"></circle>
+                            <circle class="meter-fill-blue" id="freq-meter-fill" cx="50" cy="50" fill="none" r="42"
+                                stroke-dasharray="264" stroke-dashoffset="264" stroke-width="8" stroke-linecap="round">
+                            </circle>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-4xl font-bold text-white font-mono tracking-tight"
+                                id="freq-value">--</span>
+                            <span class="text-sm font-medium text-text-muted uppercase">Hz</span>
+                        </div>
                     </div>
                 </div>
 
-                <!-- Test Mode -->
-                <div class="grid grid-cols-2 gap-3">
-                    <label
-                        class="flex items-center gap-3 p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
-                        <input type="radio" name="test-mode" value="quick" checked class="accent-primary">
-                        <div>
-                            <span class="text-sm font-medium text-white">Quick Mode</span>
-                            <span class="block text-xs text-white/40">4 frequencies</span>
+                <!-- Ear Indicator (Center) -->
+                <div class="glass-panel rounded-2xl p-6 flex flex-col items-center justify-center" id="monitor-stage">
+                    <!-- Ear Visual -->
+                    <div class="relative flex items-center justify-center gap-8 mb-4">
+                        <!-- Left Ear -->
+                        <div class="flex flex-col items-center indicator-left">
+                            <div class="size-20 rounded-full bg-accent-blue/20 border-4 border-accent-blue/50 flex items-center justify-center text-accent-blue text-2xl font-bold"
+                                id="left-ear-indicator">
+                                L
+                            </div>
+                            <span class="mt-2 text-xs font-bold uppercase tracking-wider"
+                                id="left-ear-status">ACTIVE</span>
                         </div>
-                    </label>
-                    <label
-                        class="flex items-center gap-3 p-3 rounded-lg bg-white/5 cursor-pointer hover:bg-white/10 transition-colors">
-                        <input type="radio" name="test-mode" value="mini" class="accent-primary">
-                        <div>
-                            <span class="text-sm font-medium text-white">Mini Mode</span>
-                            <span class="block text-xs text-white/40">2 frequencies</span>
+
+                        <!-- Headphone Visual -->
+                        <div class="relative">
+                            <svg class="w-16 h-24" viewBox="0 0 64 96">
+                                <path d="M32 16 C 16 16 8 32 8 48 L 8 72" fill="none" stroke="#374151" stroke-width="3"
+                                    stroke-linecap="round" />
+                                <path d="M32 16 C 48 16 56 32 56 48 L 56 72" fill="none" stroke="#374151"
+                                    stroke-width="3" stroke-linecap="round" />
+                                <rect x="2" y="56" width="14" height="24" rx="4" fill="#374151" />
+                                <rect x="48" y="56" width="14" height="24" rx="4" fill="#374151" />
+                            </svg>
                         </div>
-                    </label>
+
+                        <!-- Right Ear -->
+                        <div class="flex flex-col items-center indicator-right opacity-50">
+                            <div class="size-20 rounded-full bg-accent-red/20 border-4 border-accent-red/50 flex items-center justify-center text-accent-red text-2xl font-bold"
+                                id="right-ear-indicator">
+                                R
+                            </div>
+                            <span class="mt-2 text-xs font-bold uppercase tracking-wider text-text-muted"
+                                id="right-ear-status">WAITING</span>
+                        </div>
+                    </div>
+
+                    <!-- Patient Response Button -->
+                    <div class="mt-4">
+                        <button class="relative signal-btn" id="signal-button" onmousedown="onPatientResponse(true)"
+                            onmouseup="onPatientResponse(false)" ontouchstart="onPatientResponse(true)"
+                            ontouchend="onPatientResponse(false)">
+                            <div
+                                class="signal-glow absolute inset-0 bg-accent-yellow rounded-full blur-xl opacity-0 transition-opacity duration-200">
+                            </div>
+                            <div
+                                class="signal-bulb relative size-20 rounded-full bg-surface-dark border-4 border-surface-border shadow-inner flex items-center justify-center overflow-hidden transition-colors duration-100">
+                                <span
+                                    class="signal-icon material-symbols-outlined text-text-muted text-4xl transition-colors">sensors</span>
+                            </div>
+                        </button>
+                        <p class="text-center text-xs text-text-muted font-bold uppercase tracking-wider mt-3">Patient
+                            Response</p>
+                    </div>
+                </div>
+
+                <!-- Level Gauge -->
+                <div class="glass-panel rounded-2xl p-6 flex flex-col items-center justify-center">
+                    <div class="flex items-center gap-2 mb-4">
+                        <span class="material-symbols-outlined text-accent-green">volume_up</span>
+                        <span class="text-xs font-bold text-text-secondary uppercase tracking-widest">Output
+                            Level</span>
+                    </div>
+                    <div class="relative size-40">
+                        <svg class="size-full -rotate-90 transform" viewbox="0 0 100 100">
+                            <circle class="meter-track" cx="50" cy="50" fill="none" r="42" stroke-width="8"></circle>
+                            <circle class="meter-fill-green" id="level-meter-fill" cx="50" cy="50" fill="none" r="42"
+                                stroke-dasharray="264" stroke-dashoffset="264" stroke-width="8" stroke-linecap="round">
+                            </circle>
+                        </svg>
+                        <div class="absolute inset-0 flex flex-col items-center justify-center">
+                            <span class="text-4xl font-bold text-white font-mono tracking-tight"
+                                id="level-value">--</span>
+                            <span class="text-sm font-medium text-text-muted uppercase">dB HL</span>
+                        </div>
+                    </div>
                 </div>
             </div>
-        </div>
 
-        <div class="h-4"></div>
-    </main>
+            <!-- Bottom Controls -->
+            <div class="glass-panel rounded-xl p-4 mt-6 flex items-center justify-between">
+                <div class="flex items-center gap-6">
+                    <div>
+                        <span class="text-xs text-text-muted uppercase">Talk Forward</span>
+                        <button
+                            class="mt-1 flex items-center gap-2 px-4 py-2 bg-surface-border/50 rounded-lg text-sm text-white hover:bg-surface-border transition-colors">
+                            <span class="material-symbols-outlined text-lg">mic</span>
+                            Hold to Talk
+                        </button>
+                    </div>
+                    <div>
+                        <span class="text-xs text-text-muted uppercase">Step Size</span>
+                        <div class="mt-1 flex rounded-lg overflow-hidden border border-surface-border">
+                            <button
+                                class="px-3 py-2 bg-surface-dark text-text-muted text-sm hover:bg-surface-border transition-colors">1dB</button>
+                            <button class="px-3 py-2 bg-primary text-white text-sm font-medium">5dB</button>
+                            <button
+                                class="px-3 py-2 bg-surface-dark text-text-muted text-sm hover:bg-surface-border transition-colors">10dB</button>
+                        </div>
+                    </div>
+                </div>
+                <div class="flex items-center gap-4">
+                    <div class="glass-panel rounded-lg px-4 py-3 w-48">
+                        <div class="h-8 bg-surface-border/50 rounded flex items-end px-1 gap-0.5">
+                            <!-- Mini waveform visualization placeholder -->
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 30%"></div>
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 60%"></div>
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 40%"></div>
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 80%"></div>
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 50%"></div>
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 70%"></div>
+                            <div class="w-1 bg-accent-blue/50 rounded-t" style="height: 45%"></div>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-text-muted uppercase">Last Point</span>
+                        <p class="text-sm font-medium text-white font-mono" id="last-point">-- Hz @ -- dB</p>
+                    </div>
+                </div>
+            </div>
+        </main>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- PATIENT SEARCH MODAL -->
+    <!-- ============================================================ -->
+    <div id="patient-search-modal" class="fixed inset-0 bg-black/70 z-50 hidden flex items-center justify-center p-4">
+        <div
+            class="bg-surface-dark rounded-2xl w-full max-w-2xl max-h-[80vh] overflow-hidden border border-surface-border shadow-card">
+            <!-- Modal Header -->
+            <div class="flex items-center justify-between p-5 border-b border-surface-border">
+                <div class="flex items-center gap-3">
+                    <span class="material-symbols-outlined text-primary text-2xl">search</span>
+                    <h3 class="text-xl font-bold text-white">Search Patient</h3>
+                </div>
+                <button onclick="closePatientSearch()"
+                    class="size-8 flex items-center justify-center rounded-full hover:bg-surface-border transition-colors">
+                    <span class="material-symbols-outlined text-text-muted">close</span>
+                </button>
+            </div>
+
+            <!-- Search Input -->
+            <div class="p-5 border-b border-surface-border">
+                <div class="flex gap-3">
+                    <input type="text" id="patient-search-input" placeholder="Enter phone number or name..."
+                        class="flex-1 h-12 px-4 bg-background-dark border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors"
+                        onkeyup="if(event.key === 'Enter') searchPatient()">
+                    <button onclick="searchPatient()"
+                        class="px-6 h-12 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg transition-colors">
+                        Search
+                    </button>
+                </div>
+            </div>
+
+            <!-- Search Results -->
+            <div class="p-5 overflow-y-auto max-h-[400px]" id="patient-search-results">
+                <p class="text-text-muted text-center py-8">Enter a phone number or name to search</p>
+            </div>
+        </div>
+    </div>
+
+    <!-- ============================================================ -->
+    <!-- VIEW 4: RESULTS VIEW -->
+    <!-- ============================================================ -->
+    <div id="view-results" class="flex-1 flex hidden">
+        <!-- Left Sidebar -->
+        <aside class="w-64 bg-background-dark border-r border-surface-border p-5 flex flex-col">
+            <!-- Clock -->
+            <div class="mb-6">
+                <div class="font-mono text-4xl font-bold tracking-tight" id="results-clock">14:32:05</div>
+                <p class="text-xs text-accent-green font-medium uppercase tracking-wider mt-1">Session Time</p>
+            </div>
+
+            <!-- Patient Info -->
+            <div class="glass-panel rounded-xl p-4 mb-4">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-text-muted text-lg">person</span>
+                    <span class="text-xs text-text-secondary font-semibold uppercase tracking-wider">Patient</span>
+                </div>
+                <div class="space-y-2">
+                    <div class="text-white font-medium" id="results-patient-name">--</div>
+                    <div class="text-text-muted text-sm" id="results-patient-id">ID: --</div>
+                </div>
+            </div>
+
+            <!-- Actions -->
+            <div class="mt-auto space-y-3">
+                <button onclick="generatePDFReport()"
+                    class="w-full flex items-center justify-center gap-2 h-12 bg-accent-green hover:bg-accent-green/90 text-white font-bold text-sm rounded-lg shadow-glow-green transition-all">
+                    <span class="material-symbols-outlined">print</span>
+                    PRINT REPORT
+                </button>
+                <button onclick="exportResultsCSV()"
+                    class="w-full flex items-center justify-center gap-2 h-12 bg-surface-dark hover:bg-surface-border text-white font-bold text-sm rounded-lg border border-surface-border transition-all">
+                    <span class="material-symbols-outlined">download</span>
+                    EXPORT CSV
+                </button>
+                <button onclick="startNewTest()"
+                    class="w-full flex items-center justify-center gap-2 h-12 bg-primary hover:bg-primary-hover text-white font-bold text-sm rounded-lg transition-all">
+                    <span class="material-symbols-outlined">refresh</span>
+                    NEW TEST
+                </button>
+            </div>
+        </aside>
+
+        <!-- Main Results Content -->
+        <main class="flex-1 flex flex-col p-6 overflow-y-auto">
+            <!-- Test Summary -->
+            <div class="glass-panel rounded-xl p-4 mb-6">
+                <div class="flex items-center justify-between">
+                    <div class="flex items-center gap-3">
+                        <span class="material-symbols-outlined text-accent-green text-2xl">check_circle</span>
+                        <div>
+                            <h2 class="text-xl font-bold text-white">Test Complete</h2>
+                            <p class="text-text-muted text-sm" id="results-test-date">--</p>
+                        </div>
+                    </div>
+                    <div class="text-right">
+                        <span class="text-xs text-text-muted uppercase">Duration</span>
+                        <p class="text-lg font-mono font-bold text-white" id="results-duration">--:--</p>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Smart Interpretation Panel -->
+            <div class="glass-panel rounded-xl p-5 mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-accent-yellow">psychology</span>
+                    <h3 class="text-sm font-bold text-text-secondary uppercase tracking-wider">Smart Interpretation</h3>
+                </div>
+
+                <div id="interpretation-loading" class="text-text-muted text-center py-4">
+                    <span class="material-symbols-outlined animate-spin">progress_activity</span>
+                    <p class="mt-2">Analyzing results...</p>
+                </div>
+
+                <div id="interpretation-content" class="hidden">
+                    <p class="text-white font-medium mb-3" id="interpretation-summary">--</p>
+
+                    <div class="grid grid-cols-2 gap-4 mb-4">
+                        <div class="bg-surface-border/30 rounded-lg p-3">
+                            <span class="text-xs text-accent-blue uppercase font-bold">Left Ear</span>
+                            <p class="text-white mt-1" id="interpretation-left">--</p>
+                        </div>
+                        <div class="bg-surface-border/30 rounded-lg p-3">
+                            <span class="text-xs text-accent-red uppercase font-bold">Right Ear</span>
+                            <p class="text-white mt-1" id="interpretation-right">--</p>
+                        </div>
+                    </div>
+
+                    <div id="interpretation-remarks" class="space-y-2 mb-4"></div>
+
+                    <div id="interpretation-recommendations" class="space-y-2"></div>
+                </div>
+            </div>
+
+            <!-- Doctor's Notes -->
+            <div class="glass-panel rounded-xl p-5 mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-primary">edit_note</span>
+                    <h3 class="text-sm font-bold text-text-secondary uppercase tracking-wider">Doctor's Notes</h3>
+                </div>
+
+                <div class="space-y-4">
+                    <div>
+                        <label class="block text-xs text-text-muted mb-2">Doctor Name</label>
+                        <input type="text" id="doctor-name-input" placeholder="Enter doctor's name"
+                            class="w-full h-10 px-4 bg-surface-border/30 border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors">
+                    </div>
+                    <div>
+                        <label class="block text-xs text-text-muted mb-2">Additional Remarks</label>
+                        <textarea id="doctor-remarks-input" rows="3" placeholder="Add notes or remarks..."
+                            class="w-full px-4 py-3 bg-surface-border/30 border border-surface-border rounded-lg text-white placeholder-text-muted focus:border-primary transition-colors resize-none"></textarea>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Results Table -->
+            <div class="glass-panel rounded-xl p-5">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-accent-blue">table_chart</span>
+                    <h3 class="text-sm font-bold text-text-secondary uppercase tracking-wider">Test Results</h3>
+                </div>
+
+                <div class="overflow-x-auto">
+                    <table class="w-full text-sm">
+                        <thead>
+                            <tr class="text-text-muted text-xs uppercase tracking-wider">
+                                <th class="py-2 px-3 text-left">Frequency</th>
+                                <th class="py-2 px-3 text-center text-accent-red">Right Ear (dB)</th>
+                                <th class="py-2 px-3 text-center text-accent-blue">Left Ear (dB)</th>
+                            </tr>
+                        </thead>
+                        <tbody id="results-table-body" class="text-white">
+                            <!-- Populated by JavaScript -->
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </main>
+    </div>
 
     <script>
         // ============================================================
@@ -418,16 +871,19 @@
         let currentLevel = null;
         let statePollingInterval = null;
 
-        // Timer state (Task 1)
+        // Timer state
         let timerInterval = null;
         let testStartTime = null;
         let testElapsedSeconds = 0;
 
-        // Test results storage (Task 4)
+        // Test results storage
         let testResults = { left: {}, right: {} };
 
+        // Patient data from form
+        let patientData = { name: '', id: '', age: '' };
+
         // ============================================================
-        // Debounce & Guard State (Bug Fixes)
+        // Debounce & Guard State
         // ============================================================
         let isStartButtonLocked = false;
         let isStopButtonLocked = false;
@@ -439,8 +895,8 @@
         // Initialization
         // ============================================================
         document.addEventListener('DOMContentLoaded', () => {
-            updateClock();
-            setInterval(updateClock, 1000);
+            updateAllClocks();
+            setInterval(updateAllClocks, 1000);
 
             // Wait for pywebview to be ready
             if (window.pywebview) {
@@ -453,21 +909,40 @@
         function initializePyWebView() {
             console.log('PyWebView ready');
             refreshDevices();
-            updateConnectionStatus('Connected', true);
         }
 
         // ============================================================
-        // Clock
+        // Clock Updates
         // ============================================================
-        function updateClock() {
+        function updateAllClocks() {
             const now = new Date();
             const hours = String(now.getHours()).padStart(2, '0');
             const minutes = String(now.getMinutes()).padStart(2, '0');
-            document.getElementById('current-time').textContent = `${hours}:${minutes}`;
+            const seconds = String(now.getSeconds()).padStart(2, '0');
+            const timeStr = `${hours}:${minutes}:${seconds}`;
+
+            document.getElementById('intro-clock').textContent = timeStr;
+            document.getElementById('reg-clock').textContent = timeStr;
+            document.getElementById('dashboard-clock').textContent = timeStr;
+            const resultsClock = document.getElementById('results-clock');
+            if (resultsClock) resultsClock.textContent = timeStr;
         }
 
         // ============================================================
-        // Test Timer (Task 1)
+        // View Switching
+        // ============================================================
+        function switchToView(viewId) {
+            // Hide all views
+            document.querySelectorAll('[id^="view-"]').forEach(view => {
+                view.classList.add('hidden');
+            });
+
+            // Show the requested view
+            document.getElementById(viewId).classList.remove('hidden');
+        }
+
+        // ============================================================
+        // Test Timer
         // ============================================================
         function formatTime(totalSeconds) {
             const minutes = Math.floor(totalSeconds / 60);
@@ -476,22 +951,17 @@
         }
 
         function startTimer() {
-            // Reset timer state
             testStartTime = Date.now();
             testElapsedSeconds = 0;
 
-            // Show duration display
             const durationEl = document.getElementById('test-duration');
             durationEl.classList.remove('hidden');
             durationEl.textContent = 'Duration: 00:00';
-            document.getElementById('time-label').textContent = 'Test Running';
 
-            // Clear any existing timer
             if (timerInterval) {
                 clearInterval(timerInterval);
             }
 
-            // Start interval timer - updates every second
             timerInterval = setInterval(() => {
                 testElapsedSeconds = Math.floor((Date.now() - testStartTime) / 1000);
                 durationEl.textContent = `Duration: ${formatTime(testElapsedSeconds)}`;
@@ -499,63 +969,14 @@
         }
 
         function stopTimer() {
-            // Stop the interval
             if (timerInterval) {
                 clearInterval(timerInterval);
                 timerInterval = null;
             }
 
-            // Keep final time displayed
             const durationEl = document.getElementById('test-duration');
             if (testElapsedSeconds > 0) {
                 durationEl.textContent = `Final: ${formatTime(testElapsedSeconds)}`;
-            }
-
-            document.getElementById('time-label').textContent = 'Time';
-        }
-
-        // ============================================================
-        // Patient Fields Locking (Task 2)
-        // ============================================================
-        function setPatientFieldsLocked(locked) {
-            const fields = [
-                document.getElementById('patient-name'),
-                document.getElementById('patient-id'),
-                document.getElementById('patient-age'),
-                document.getElementById('device-select')
-            ];
-
-            fields.forEach(field => {
-                if (field) {
-                    field.disabled = locked;
-                    if (locked) {
-                        field.classList.add('opacity-50', 'cursor-not-allowed');
-                    } else {
-                        field.classList.remove('opacity-50', 'cursor-not-allowed');
-                    }
-                }
-            });
-
-            // Disable radio buttons
-            const radios = document.querySelectorAll('input[name="test-mode"]');
-            radios.forEach(radio => {
-                radio.disabled = locked;
-            });
-        }
-
-        // ============================================================
-        // Connection Status
-        // ============================================================
-        function updateConnectionStatus(status, connected) {
-            document.getElementById('connection-status').textContent = status;
-            const indicator = document.getElementById('connection-indicator');
-            if (connected) {
-                indicator.innerHTML = `
-                <span class="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
-                <span class="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
-            `;
-            } else {
-                indicator.innerHTML = `<span class="relative inline-flex rounded-full h-2 w-2 bg-accent-red"></span>`;
             }
         }
 
@@ -589,55 +1010,70 @@
         }
 
         // ============================================================
-        // Test Control
+        // Registration Form
         // ============================================================
-        async function startTest() {
-            // Guard clause: prevent double-click and race conditions
-            if (isTestRunning || isStartButtonLocked) {
-                console.log('Start blocked: test running or button locked');
+        async function saveAndContinue() {
+            // Validate inputs
+            const name = document.getElementById('input-name').value.trim();
+            const id = document.getElementById('input-id').value.trim();
+            const phone = document.getElementById('input-phone').value.trim();
+            const age = document.getElementById('input-age').value.trim();
+            const gender = document.querySelector('input[name="gender"]:checked')?.value || '';
+            const physician = document.getElementById('input-physician').value.trim();
+            const deviceId = document.getElementById('device-select').value;
+            const testMode = document.querySelector('input[name="test-mode"]:checked').value;
+
+            // Validation
+            if (!name) {
+                alert('Please enter patient name');
+                document.getElementById('input-name').focus();
                 return;
             }
 
-            // Debounce: lock button immediately
-            isStartButtonLocked = true;
-            setTimeout(() => { isStartButtonLocked = false; }, BUTTON_DEBOUNCE_MS);
-
-            // Input validation
-            const deviceId = document.getElementById('device-select').value;
-            const patientName = document.getElementById('patient-name').value.trim();
-            const patientAge = document.getElementById('patient-age').value.trim();
-            const patientId = document.getElementById('patient-id').value.trim();
-            const testMode = document.querySelector('input[name="test-mode"]:checked').value;
-
-            // Validate device selection
             if (!deviceId) {
                 alert('Please select an audio device');
                 return;
             }
 
-            // Validate patient name (required)
-            if (!patientName) {
-                alert('Please enter patient name');
-                document.getElementById('patient-name').focus();
-                return;
-            }
-
-            // Validate age (optional but must be positive integer if provided)
-            if (patientAge) {
-                const ageNum = parseInt(patientAge, 10);
+            if (age) {
+                const ageNum = parseInt(age, 10);
                 if (isNaN(ageNum) || ageNum <= 0 || ageNum > 150) {
                     alert('Age must be a positive number between 1 and 150');
-                    document.getElementById('patient-age').focus();
+                    document.getElementById('input-age').focus();
                     return;
                 }
             }
 
+            // Store patient data
+            patientData = { name, id, phone, age, gender, referring_physician: physician };
+
+            // Update dashboard with patient info
+            document.getElementById('dashboard-patient-name').textContent = name;
+            document.getElementById('dashboard-patient-id').textContent = id || '--';
+            document.getElementById('dashboard-patient-age').textContent = age || '--';
+
+            // Get selected device name
+            const deviceSelect = document.getElementById('device-select');
+            const deviceName = deviceSelect.options[deviceSelect.selectedIndex]?.text || 'Unknown';
+            document.getElementById('dashboard-device-name').textContent = deviceName;
+
+            // Save patient to database
+            try {
+                await window.pywebview.api.save_patient(patientData);
+            } catch (e) {
+                console.warn('Failed to save patient to database:', e);
+            }
+
+            // Switch to dashboard
+            switchToView('view-dashboard');
+
+            // Start the test
             try {
                 const result = await window.pywebview.api.start_test(
                     parseInt(deviceId),
-                    patientName || 'Unknown Patient',
-                    patientAge,
-                    patientId,
+                    name,
+                    age,
+                    id,
                     testMode === 'quick',
                     testMode === 'mini'
                 );
@@ -646,19 +1082,60 @@
                     isTestRunning = true;
                     document.body.classList.remove('test-stopped');
                     document.body.classList.add('test-running');
-                    updateConnectionStatus('Testing', true);
 
-                    // Task 1: Start the timer
                     startTimer();
-
-                    // Task 2: Lock patient fields
-                    setPatientFieldsLocked(true);
-
-                    // Task 4: Reset results storage
                     testResults = { left: {}, right: {} };
-
-                    // Start polling for state updates
                     statePollingInterval = setInterval(pollTestState, 200);
+
+                    document.getElementById('current-stage').textContent = 'Current Stage: Testing in progress...';
+                } else {
+                    alert('Failed to start test: ' + result.error);
+                }
+            } catch (e) {
+                console.error('Start test error:', e);
+                alert('Error starting test: ' + (e.message || 'Unknown error'));
+            }
+        }
+
+        // ============================================================
+        // Test Control
+        // ============================================================
+        async function startTest() {
+            if (isTestRunning || isStartButtonLocked) {
+                console.log('Start blocked: test running or button locked');
+                return;
+            }
+
+            isStartButtonLocked = true;
+            setTimeout(() => { isStartButtonLocked = false; }, BUTTON_DEBOUNCE_MS);
+
+            try {
+                const deviceId = document.getElementById('device-select')?.value;
+
+                if (!deviceId) {
+                    alert('No audio device selected');
+                    return;
+                }
+
+                const result = await window.pywebview.api.start_test(
+                    parseInt(deviceId),
+                    patientData.name || 'Unknown Patient',
+                    patientData.age || '',
+                    patientData.id || '',
+                    true,
+                    false
+                );
+
+                if (result.success) {
+                    isTestRunning = true;
+                    document.body.classList.remove('test-stopped');
+                    document.body.classList.add('test-running');
+
+                    startTimer();
+                    testResults = { left: {}, right: {} };
+                    statePollingInterval = setInterval(pollTestState, 200);
+
+                    document.getElementById('current-stage').textContent = 'Current Stage: Testing in progress...';
                 } else {
                     alert('Failed to start test: ' + result.error);
                 }
@@ -669,13 +1146,11 @@
         }
 
         async function stopTest() {
-            // Guard clause: prevent double-click
             if (!isTestRunning || isStopButtonLocked) {
                 console.log('Stop blocked: not running or button locked');
                 return;
             }
 
-            // Debounce: lock button immediately
             isStopButtonLocked = true;
             setTimeout(() => { isStopButtonLocked = false; }, BUTTON_DEBOUNCE_MS);
 
@@ -684,7 +1159,6 @@
                 onTestStopped();
             } catch (e) {
                 console.error('Stop test error:', e);
-                // Force UI reset on error to prevent stuck state
                 onTestStopped();
             }
         }
@@ -693,26 +1167,19 @@
             isTestRunning = false;
             document.body.classList.remove('test-running');
             document.body.classList.add('test-stopped');
-            updateConnectionStatus('Ready', true);
 
-            // Task 1: Stop the timer
             stopTimer();
-
-            // Task 2: Unlock patient fields
-            setPatientFieldsLocked(false);
 
             if (statePollingInterval) {
                 clearInterval(statePollingInterval);
                 statePollingInterval = null;
             }
 
-            // Reset UI
             setEar(null);
             setFrequency(null);
             setLevel(null);
 
-            // Hide ear badge
-            document.getElementById('ear-badge').classList.add('hidden');
+            document.getElementById('current-stage').textContent = 'Current Stage: Test completed';
         }
 
         async function pollTestState() {
@@ -722,16 +1189,12 @@
                 if (!state.is_running) {
                     onTestStopped();
                     if (state.completed) {
-                        updateConnectionStatus('Completed', true);
                         setProgress(100);
-
-                        // Task 4: Auto-export CSV on completion
                         exportResultsCSV();
                     }
                     return;
                 }
 
-                // Update UI from state
                 if (state.ear !== currentEar) {
                     setEar(state.ear);
                 }
@@ -754,7 +1217,6 @@
         async function onPatientResponse(pressed) {
             const btn = document.getElementById('signal-button');
 
-            // Debounce rapid clicks to prevent API spam
             if (pressed && responseDebounceActive) {
                 return;
             }
@@ -779,7 +1241,7 @@
             }
         }
 
-        // Also support spacebar
+        // Spacebar support
         document.addEventListener('keydown', (e) => {
             if (e.code === 'Space' && !e.repeat) {
                 e.preventDefault();
@@ -798,42 +1260,43 @@
         // ============================================================
         function setEar(ear) {
             currentEar = ear;
+            const leftIndicator = document.querySelector('.indicator-left');
+            const rightIndicator = document.querySelector('.indicator-right');
+            const leftStatus = document.getElementById('left-ear-status');
+            const rightStatus = document.getElementById('right-ear-status');
             const stage = document.getElementById('monitor-stage');
-            const label = document.getElementById('ear-label');
-            const icon = document.getElementById('ear-icon');
-            const badge = document.getElementById('ear-badge');
-            const badgeText = document.getElementById('ear-badge-text');
 
-            stage.classList.remove('ear-left', 'ear-right', 'ear-none');
+            stage.classList.remove('ear-left', 'ear-right');
 
             if (ear === 'left') {
                 stage.classList.add('ear-left');
-                label.textContent = 'Testing Left';
-                label.className = 'block text-accent-blue text-xs font-bold uppercase tracking-widest mb-1';
-                icon.className = 'material-symbols-outlined text-accent-blue text-3xl';
-
-                // Task 3: Show prominent ear badge
-                badge.classList.remove('hidden', 'bg-accent-red', 'text-white');
-                badge.classList.add('bg-accent-blue', 'text-white');
-                badgeText.textContent = '🔵 TESTING: LEFT EAR';
+                leftIndicator.classList.remove('opacity-50');
+                rightIndicator.classList.add('opacity-50');
+                leftStatus.textContent = 'ACTIVE';
+                leftStatus.classList.remove('text-text-muted');
+                leftStatus.classList.add('text-accent-blue');
+                rightStatus.textContent = 'WAITING';
+                rightStatus.classList.add('text-text-muted');
+                rightStatus.classList.remove('text-accent-red');
+                document.getElementById('current-stage').textContent = 'Current Stage: Testing Left Ear';
             } else if (ear === 'right') {
                 stage.classList.add('ear-right');
-                label.textContent = 'Testing Right';
-                label.className = 'block text-accent-red text-xs font-bold uppercase tracking-widest mb-1';
-                icon.className = 'material-symbols-outlined text-accent-red text-3xl';
-
-                // Task 3: Show prominent ear badge
-                badge.classList.remove('hidden', 'bg-accent-blue', 'text-white');
-                badge.classList.add('bg-accent-red', 'text-white');
-                badgeText.textContent = '🔴 TESTING: RIGHT EAR';
+                leftIndicator.classList.add('opacity-50');
+                rightIndicator.classList.remove('opacity-50');
+                leftStatus.textContent = 'COMPLETE';
+                leftStatus.classList.add('text-text-muted');
+                leftStatus.classList.remove('text-accent-blue');
+                rightStatus.textContent = 'ACTIVE';
+                rightStatus.classList.remove('text-text-muted');
+                rightStatus.classList.add('text-accent-red');
+                document.getElementById('current-stage').textContent = 'Current Stage: Testing Right Ear';
             } else {
-                stage.classList.add('ear-none');
-                label.textContent = 'Ready';
-                label.className = 'block text-white/50 text-xs font-bold uppercase tracking-widest mb-1';
-                icon.className = 'material-symbols-outlined text-white/30 text-3xl';
-
-                // Hide badge when not testing
-                badge.classList.add('hidden');
+                leftIndicator.classList.add('opacity-50');
+                rightIndicator.classList.add('opacity-50');
+                leftStatus.textContent = 'READY';
+                leftStatus.classList.add('text-text-muted');
+                rightStatus.textContent = 'READY';
+                rightStatus.classList.add('text-text-muted');
             }
         }
 
@@ -844,18 +1307,20 @@
 
             if (freq === null) {
                 valueEl.textContent = '--';
-                fillEl.style.strokeDashoffset = '283';
+                fillEl.style.strokeDashoffset = '264';
                 return;
             }
 
             valueEl.textContent = freq;
-            // Map frequency to meter (125Hz - 8000Hz range)
             const freqLog = Math.log10(freq);
             const minLog = Math.log10(125);
             const maxLog = Math.log10(8000);
             const percent = (freqLog - minLog) / (maxLog - minLog);
-            const offset = 283 - (283 * percent);
+            const offset = 264 - (264 * percent);
             fillEl.style.strokeDashoffset = offset;
+
+            // Update last point
+            updateLastPoint();
         }
 
         function setLevel(level) {
@@ -865,25 +1330,28 @@
 
             if (level === null) {
                 valueEl.textContent = '--';
-                fillEl.style.strokeDashoffset = '283';
+                fillEl.style.strokeDashoffset = '264';
                 return;
             }
 
             valueEl.textContent = level;
-            // Map level to meter (-10 to 100 dBHL range)
             const percent = (level + 10) / 110;
-            const offset = 283 - (283 * Math.max(0, Math.min(1, percent)));
+            const offset = 264 - (264 * Math.max(0, Math.min(1, percent)));
             fillEl.style.strokeDashoffset = offset;
+
+            // Update last point
+            updateLastPoint();
+        }
+
+        function updateLastPoint() {
+            if (currentFreq !== null && currentLevel !== null) {
+                document.getElementById('last-point').textContent = `${currentFreq} Hz @ ${currentLevel} dB`;
+            }
         }
 
         function setProgress(percent) {
             document.getElementById('progress-text').textContent = Math.round(percent) + '%';
             document.getElementById('progress-fill').style.width = percent + '%';
-        }
-
-        function toggleConfig() {
-            const panel = document.getElementById('config-panel');
-            panel.classList.toggle('hidden');
         }
 
         // ============================================================
@@ -901,7 +1369,6 @@
                 setTimeout(() => btn.classList.remove('active'), 200);
             }
 
-            // Task 4: Store results as they come in
             if (data.result) {
                 const { ear, frequency, level } = data.result;
                 if (ear && frequency !== undefined && level !== undefined) {
@@ -911,11 +1378,10 @@
         };
 
         // ============================================================
-        // CSV Export (Task 4)
+        // CSV Export
         // ============================================================
         async function exportResultsCSV() {
             try {
-                // Get results from backend
                 const results = await window.pywebview.api.get_results();
 
                 if (!results || !results.success) {
@@ -926,20 +1392,13 @@
                 const data = results.data;
                 const frequencies = [125, 250, 500, 1000, 2000, 4000, 8000];
 
-                // Check for incomplete data and warn user
-                let totalExpected = frequencies.length * 2; // Both ears
+                let totalExpected = frequencies.length * 2;
                 let totalFound = 0;
                 frequencies.forEach(freq => {
                     if (data.right[freq] !== undefined) totalFound++;
                     if (data.left[freq] !== undefined) totalFound++;
                 });
 
-                if (totalFound < totalExpected) {
-                    console.warn(`Incomplete test data: ${totalFound}/${totalExpected} measurements recorded`);
-                    // Add warning to CSV
-                }
-
-                // Build CSV content with completeness note
                 let csvContent = '';
                 if (totalFound < totalExpected) {
                     csvContent += `# WARNING: Incomplete test - only ${totalFound}/${totalExpected} measurements\n`;
@@ -952,16 +1411,13 @@
                     csvContent += `${freq},${rightVal},${leftVal}\n`;
                 });
 
-                // Create download
                 const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
                 const url = URL.createObjectURL(blob);
                 const link = document.createElement('a');
 
-                // Generate filename with timestamp (sanitize patient name)
                 const now = new Date();
                 const timestamp = now.toISOString().slice(0, 19).replace(/[T:]/g, '-');
-                const rawPatientName = document.getElementById('patient-name').value || 'patient';
-                // Sanitize filename: remove special chars that could break filesystem
+                const rawPatientName = patientData.name || 'patient';
                 const patientName = rawPatientName.replace(/[<>:"/\\|?*]/g, '_').replace(/\s+/g, '_');
                 const filename = `audiogram_${patientName}_${timestamp}.csv`;
 
@@ -973,11 +1429,347 @@
                 document.body.removeChild(link);
                 URL.revokeObjectURL(url);
 
-                console.log('CSV exported:', filename, totalFound < totalExpected ? '(INCOMPLETE)' : '(COMPLETE)');
+                console.log('CSV exported:', filename);
             } catch (e) {
                 console.error('CSV export failed:', e);
             }
         }
+
+        // ============================================================
+        // Patient Search
+        // ============================================================
+        function openPatientSearch() {
+            document.getElementById('patient-search-modal').classList.remove('hidden');
+            document.getElementById('patient-search-input').value = '';
+            document.getElementById('patient-search-input').focus();
+            document.getElementById('patient-search-results').innerHTML =
+                '<p class="text-text-muted text-center py-8">Enter a phone number or name to search</p>';
+        }
+
+        function closePatientSearch() {
+            document.getElementById('patient-search-modal').classList.add('hidden');
+        }
+
+        function escapeHtml(text) {
+            if (!text) return '';
+            return String(text)
+                .replace(/&/g, "&amp;")
+                .replace(/</g, "&lt;")
+                .replace(/>/g, "&gt;")
+                .replace(/"/g, "&quot;")
+                .replace(/'/g, "&#039;");
+        }
+
+        async function searchPatient() {
+            const query = document.getElementById('patient-search-input').value.trim();
+            if (!query) {
+                alert('Please enter a search term');
+                return;
+            }
+
+            const resultsDiv = document.getElementById('patient-search-results');
+            resultsDiv.innerHTML = '<p class="text-text-muted text-center py-4">Searching...</p>';
+
+            try {
+                const result = await window.pywebview.api.search_patient(query);
+
+                if (!result.success) {
+                    resultsDiv.innerHTML = `<p class="text-accent-red text-center py-4">${escapeHtml(result.error)}</p>`;
+                    return;
+                }
+
+                if (result.patients.length === 0) {
+                    resultsDiv.innerHTML = '<p class="text-text-muted text-center py-8">No patients found</p>';
+                    return;
+                }
+
+                let html = '';
+                result.patients.forEach(patient => {
+                    html += `
+                        <div class="bg-surface-border/30 rounded-lg p-4 mb-3 hover:bg-surface-border/50 transition-colors cursor-pointer"
+                             onclick="loadPatientForTest(${patient.id})">
+                            <div class="flex items-center justify-between">
+                                <div>
+                                    <p class="text-white font-medium">${escapeHtml(patient.name)}</p>
+                                    <p class="text-text-muted text-sm">${escapeHtml(patient.phone || 'No phone')} | ID: ${escapeHtml(patient.patient_ref_id || '--')}</p>
+                                </div>
+                                <div class="flex items-center gap-2">
+                                    <button onclick="event.stopPropagation(); viewPatientHistory(${patient.id})"
+                                            class="px-3 py-1 bg-surface-dark text-text-secondary text-xs rounded hover:bg-surface-border transition-colors">
+                                        View History
+                                    </button>
+                                    <span class="material-symbols-outlined text-primary">arrow_forward</span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                });
+                resultsDiv.innerHTML = html;
+
+            } catch (e) {
+                console.error('Search failed:', e);
+                resultsDiv.innerHTML = '<p class="text-accent-red text-center py-4">Search failed</p>';
+            }
+        }
+
+        async function loadPatientForTest(patientId) {
+            try {
+                const result = await window.pywebview.api.load_patient(patientId);
+                if (!result.success) {
+                    alert('Failed to load patient: ' + result.error);
+                    return;
+                }
+
+                const patient = result.patient;
+
+                // Fill in registration form
+                document.getElementById('input-name').value = patient.name || '';
+                document.getElementById('input-id').value = patient.patient_ref_id || '';
+                document.getElementById('input-phone').value = patient.phone || '';
+                document.getElementById('input-age').value = patient.age || '';
+                document.getElementById('input-physician').value = patient.referring_physician || '';
+
+                if (patient.gender) {
+                    const genderRadio = document.querySelector(`input[name="gender"][value="${patient.gender}"]`);
+                    if (genderRadio) genderRadio.checked = true;
+                }
+
+                closePatientSearch();
+                switchToView('view-registration');
+
+            } catch (e) {
+                console.error('Failed to load patient:', e);
+                alert('Failed to load patient data');
+            }
+        }
+
+        async function viewPatientHistory(patientId) {
+            try {
+                const result = await window.pywebview.api.get_patient_history(patientId);
+                if (!result.success) {
+                    alert('Failed to load history: ' + result.error);
+                    return;
+                }
+
+                const patient = result.patient;
+                const history = result.history;
+
+                let html = `
+                    <div class="mb-4 p-4 bg-primary/10 rounded-lg border border-primary/30">
+                        <h4 class="text-white font-bold">${escapeHtml(patient.name)}</h4>
+                        <p class="text-text-muted text-sm">${escapeHtml(patient.phone || 'No phone')} | ${history.length} previous test(s)</p>
+                    </div>
+                `;
+
+                if (history.length === 0) {
+                    html += '<p class="text-text-muted text-center py-4">No test history available</p>';
+                } else {
+                    history.forEach((test, index) => {
+                        const date = new Date(test.test_date).toLocaleDateString();
+                        html += `
+                            <div class="bg-surface-border/30 rounded-lg p-3 mb-2">
+                                <div class="flex items-center justify-between">
+                                    <div>
+                                        <p class="text-white text-sm">${escapeHtml(date)}</p>
+                                        <p class="text-text-muted text-xs">${escapeHtml(test.interpretation || 'No interpretation')}</p>
+                                    </div>
+                                    ${test.pdf_report_path ? `
+                                        <button onclick="openPDF('${test.pdf_report_path.replace(/\\/g, '\\\\')}')"
+                                                class="px-2 py-1 bg-accent-green/20 text-accent-green text-xs rounded">
+                                            View PDF
+                                        </button>
+                                    ` : ''}
+                                </div>
+                            </div>
+                        `;
+                    });
+                }
+
+                html += `
+                    <button onclick="loadPatientForTest(${patientId})"
+                            class="w-full mt-4 h-10 bg-primary hover:bg-primary-hover text-white font-bold rounded-lg transition-colors">
+                        Start New Test for This Patient
+                    </button>
+                `;
+
+                document.getElementById('patient-search-results').innerHTML = html;
+
+            } catch (e) {
+                console.error('Failed to load history:', e);
+            }
+        }
+
+        async function openPDF(pdfPath) {
+            try {
+                await window.pywebview.api.open_pdf(pdfPath);
+            } catch (e) {
+                console.error('Failed to open PDF:', e);
+            }
+        }
+
+        // ============================================================
+        // Results View & PDF Generation
+        // ============================================================
+        function showResultsView() {
+            // Update patient info
+            document.getElementById('results-patient-name').textContent = patientData.name || '--';
+            document.getElementById('results-patient-id').textContent = `ID: ${patientData.id || '--'}`;
+
+            // Update test date and duration
+            const now = new Date();
+            document.getElementById('results-test-date').textContent = now.toLocaleString();
+            document.getElementById('results-duration').textContent = formatTime(testElapsedSeconds);
+
+            // Populate results table
+            populateResultsTable();
+
+            // Load interpretation
+            loadInterpretation();
+
+            // Switch view
+            switchToView('view-results');
+        }
+
+        function populateResultsTable() {
+            const frequencies = [250, 500, 1000, 2000, 4000, 8000];
+            const tbody = document.getElementById('results-table-body');
+            tbody.innerHTML = '';
+
+            frequencies.forEach(freq => {
+                const rightVal = testResults.right[freq] !== undefined ? testResults.right[freq] + ' dB' : '--';
+                const leftVal = testResults.left[freq] !== undefined ? testResults.left[freq] + ' dB' : '--';
+
+                const row = document.createElement('tr');
+                row.className = 'border-b border-surface-border/50';
+                row.innerHTML = `
+                    <td class="py-3 px-3 font-mono">${freq} Hz</td>
+                    <td class="py-3 px-3 text-center">${rightVal}</td>
+                    <td class="py-3 px-3 text-center">${leftVal}</td>
+                `;
+                tbody.appendChild(row);
+            });
+        }
+
+        async function loadInterpretation() {
+            document.getElementById('interpretation-loading').classList.remove('hidden');
+            document.getElementById('interpretation-content').classList.add('hidden');
+
+            try {
+                const result = await window.pywebview.api.get_interpretation();
+
+                if (!result.success) {
+                    document.getElementById('interpretation-loading').innerHTML =
+                        `<p class="text-accent-red">Failed to analyze results</p>`;
+                    return;
+                }
+
+                const interp = result.interpretation;
+
+                // Populate interpretation
+                document.getElementById('interpretation-summary').textContent = interp.summary || '--';
+                document.getElementById('interpretation-left').textContent =
+                    `${interp.left_ear?.classification || '--'} (PTA: ${interp.left_ear?.pta || '--'} dB)`;
+                document.getElementById('interpretation-right').textContent =
+                    `${interp.right_ear?.classification || '--'} (PTA: ${interp.right_ear?.pta || '--'} dB)`;
+
+                // Remarks
+                const remarksDiv = document.getElementById('interpretation-remarks');
+                remarksDiv.innerHTML = '';
+                if (interp.remarks && interp.remarks.length > 0) {
+                    interp.remarks.forEach(remark => {
+                        remarksDiv.innerHTML += `
+                            <div class="flex items-start gap-2 text-sm">
+                                <span class="material-symbols-outlined text-accent-yellow text-base mt-0.5">info</span>
+                                <span class="text-white">${remark}</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                // Recommendations
+                const recsDiv = document.getElementById('interpretation-recommendations');
+                recsDiv.innerHTML = '';
+                if (interp.recommendations && interp.recommendations.length > 0) {
+                    recsDiv.innerHTML = '<p class="text-xs text-text-muted uppercase font-bold mb-2">Recommendations</p>';
+                    interp.recommendations.forEach(rec => {
+                        recsDiv.innerHTML += `
+                            <div class="flex items-start gap-2 text-sm">
+                                <span class="material-symbols-outlined text-accent-green text-base mt-0.5">check_circle</span>
+                                <span class="text-text-secondary">${rec}</span>
+                            </div>
+                        `;
+                    });
+                }
+
+                document.getElementById('interpretation-loading').classList.add('hidden');
+                document.getElementById('interpretation-content').classList.remove('hidden');
+
+            } catch (e) {
+                console.error('Failed to load interpretation:', e);
+                document.getElementById('interpretation-loading').innerHTML =
+                    `<p class="text-accent-red">Error loading interpretation</p>`;
+            }
+        }
+
+        async function generatePDFReport() {
+            const doctorName = document.getElementById('doctor-name-input').value.trim();
+            const remarks = document.getElementById('doctor-remarks-input').value.trim();
+
+            try {
+                // Show loading state
+                const btn = event.target.closest('button');
+                const originalText = btn.innerHTML;
+                btn.innerHTML = '<span class="material-symbols-outlined animate-spin">progress_activity</span> Generating...';
+                btn.disabled = true;
+
+                const result = await window.pywebview.api.generate_pdf_report(doctorName, remarks);
+
+                btn.innerHTML = originalText;
+                btn.disabled = false;
+
+                if (!result.success) {
+                    alert('Failed to generate PDF: ' + result.error);
+                    return;
+                }
+
+                // Open the generated PDF
+                await window.pywebview.api.open_pdf(result.pdf_path);
+
+                console.log('PDF generated:', result.pdf_path);
+
+            } catch (e) {
+                console.error('PDF generation failed:', e);
+                alert('Failed to generate PDF report');
+            }
+        }
+
+        function startNewTest() {
+            // Reset state
+            testResults = { left: {}, right: {} };
+            patientData = { name: '', id: '', age: '', phone: '', gender: '' };
+            testElapsedSeconds = 0;
+
+            // Clear form
+            document.getElementById('input-name').value = '';
+            document.getElementById('input-id').value = '';
+            document.getElementById('input-phone').value = '';
+            document.getElementById('input-age').value = '';
+            document.getElementById('input-physician').value = '';
+
+            // Switch to intro
+            switchToView('view-intro');
+        }
+
+        // Update onTestStopped to show results view
+        const originalOnTestStopped = onTestStopped;
+        window.onTestStopped = function () {
+            originalOnTestStopped();
+
+            // Delay slightly to ensure results are collected
+            setTimeout(() => {
+                showResultsView();
+            }, 500);
+        };
     </script>
 
 </body>
