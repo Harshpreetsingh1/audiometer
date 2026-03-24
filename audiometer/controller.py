@@ -63,7 +63,7 @@ def config(args=None):
                         " air or bone.")
     parser.add_argument("--masking", default='off')
     parser.add_argument("--results-path", type=str,
-                        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'audiometer', 'results'))
+                        default=os.path.abspath(os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'audiometer', 'results')))
     parser.add_argument("--filename", default='result_{}'.format(time.strftime(
                         '%Y-%m-%d_%H-%M-%S')) + '.csv')
     parser.add_argument("--subject-name", type=str, default=None,
@@ -473,17 +473,11 @@ class Controller:
         Returns:
             True if sleep completed normally, False if stop_event was set
         """
-        if stop_event is None:
-            # No stop event, just sleep normally
-            time.sleep(total_time)
-            return True
-        
-        # Sleep in small increments, checking stop_event frequently
         start = time.monotonic()
         chunk_size = 0.2  # Check every 200ms for responsiveness
         
         while time.monotonic() - start < total_time:
-            if stop_event.is_set():
+            if stop_event and stop_event.is_set():
                 # Stop requested - return immediately
                 return False
             # Sleep in small chunks
@@ -506,7 +500,7 @@ class Controller:
             if hasattr(self, '_audio') and self._audio:
                 self._audio.stop()
                 # Give it a moment to stop, then close if needed
-                time.sleep(0.05)
+                self._progress_sleep(0.05)
                 # Note: We don't close here as it might be needed again
                 # The audio stream will be properly closed when Controller is destroyed
         except Exception as e:
@@ -515,7 +509,7 @@ class Controller:
     def wait_for_click(self):
         self._rpd.clear()
         self._rpd.wait_for_click_down_and_up()
-        time.sleep(1)
+        self._progress_sleep(1)
 
     def save_results(self, level, freq, earside):
         row = [level, freq, earside]
@@ -523,6 +517,7 @@ class Controller:
         # Explicit flush to avoid buffered I/O stalls
         try:
             self.csvfile.flush()
+            os.fsync(self.csvfile.fileno())
         except Exception:
             pass
 
@@ -537,7 +532,7 @@ class Controller:
         return self
 
     def __exit__(self, *args):
-        time.sleep(0.1)
+        self._progress_sleep(0.1)
         self._rpd.__exit__()
         self._audio.close()
         if self.csvfile:

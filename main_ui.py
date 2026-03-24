@@ -144,6 +144,7 @@ class AudiometerUI(ttk.Window):
         self._progress_after_id = None
         # Flag indicating whether the Tk mainloop is active (set by main())
         self._mainloop_running = False
+        self._last_progress_poll_time = 0
         
         # Register cleanup handlers for graceful shutdown
         self._register_cleanup_handlers()
@@ -1213,47 +1214,52 @@ class AudiometerUI(ttk.Window):
         """
         self._pending_progress = percentage
         if self._progress_after_id is None:
-            self._progress_after_id = self.after(100, self._apply_pending_progress)
-    
+            self._progress_after_id = self.after(500, self._apply_pending_progress)
+
     def _apply_pending_progress(self):
-        """Apply the latest pending progress value (debounced)."""
+        """Apply the latest pending progress value (debounced) with 500ms polling."""
         self._progress_after_id = None
         if self._pending_progress is not None:
             val = self._pending_progress
             self._pending_progress = None
             self._update_progress_bar_safe(val)
-    
+
     def _update_progress_bar_safe(self, percentage):
-        """Thread-safe progress bar update with clamped monotonic interpolation."""
+        """Thread-safe progress bar update with clamped monotonic interpolation using requestAnimationFrame style loop."""
         try:
-            if percentage < self._last_displayed_progress:
-                percentage = self._last_displayed_progress
+            if percentage <= self._last_displayed_progress:
+                return
             
-            delta = percentage - self._last_displayed_progress
-            
-            if delta > 5 and percentage < 100:
-                self._interpolate_progress(self._last_displayed_progress, percentage, steps=10, interval=50)
-            else:
-                self._last_displayed_progress = percentage
-                self.progress_var.set(percentage)
-                self._update_progress_text(percentage)
+            self._target_progress = percentage
+            if not getattr(self, '_is_animating_progress', False):
+                self._is_animating_progress = True
+                self._animate_progress_frame()
+
         except Exception as e:
             logging.debug(f"Error updating progress bar: {e}")
-    
-    def _interpolate_progress(self, start, end, steps, interval, current_step=0):
-        """Smoothly interpolate progress bar from start to end over multiple frames."""
-        if current_step >= steps:
-            self._last_displayed_progress = end
-            self.progress_var.set(end)
-            self._update_progress_text(end)
-            return
-        
-        fraction = (current_step + 1) / steps
-        value = start + (end - start) * fraction
-        self._last_displayed_progress = value
-        self.progress_var.set(value)
-        self._update_progress_text(value)
-        self.after(interval, lambda: self._interpolate_progress(start, end, steps, interval, current_step + 1))
+
+    def _animate_progress_frame(self):
+        """Smoothly interpolate progress bar towards target over multiple frames."""
+        try:
+            target = getattr(self, '_target_progress', self._last_displayed_progress)
+            if self._last_displayed_progress >= target:
+                self._is_animating_progress = False
+                return
+
+            # Move a small step towards target
+            step = max(0.5, (target - self._last_displayed_progress) * 0.2)
+            next_val = min(target, self._last_displayed_progress + step)
+
+            self._last_displayed_progress = next_val
+            self.progress_var.set(next_val)
+            self._update_progress_text(next_val)
+
+            if next_val < target:
+                self.after(16, self._animate_progress_frame)  # ~60fps
+            else:
+                self._is_animating_progress = False
+        except Exception:
+            self._is_animating_progress = False
     
     def _update_progress_text(self, percentage):
         """Update the progress text label."""

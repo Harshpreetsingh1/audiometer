@@ -783,6 +783,21 @@
                 </div>
             </div>
 
+            <!-- Audiogram Display -->
+            <div class="glass-panel rounded-xl p-5 mb-6">
+                <div class="flex items-center gap-2 mb-4">
+                    <span class="material-symbols-outlined text-accent-blue">insights</span>
+                    <h3 class="text-sm font-bold text-text-secondary uppercase tracking-wider">Audiogram</h3>
+                </div>
+                <div class="w-full flex justify-center bg-surface-dark rounded-lg overflow-hidden border border-surface-border p-2">
+                    <img id="audiogram-image" src="" alt="Audiogram will appear here" class="max-w-full h-auto hidden" />
+                    <div id="audiogram-placeholder" class="py-12 text-text-muted flex flex-col items-center">
+                        <span class="material-symbols-outlined text-4xl mb-2 opacity-50">image</span>
+                        <p>Audiogram generating...</p>
+                    </div>
+                </div>
+            </div>
+
             <!-- Smart Interpretation Panel -->
             <div class="glass-panel rounded-xl p-5 mb-6">
                 <div class="flex items-center gap-2 mb-4">
@@ -1626,8 +1641,36 @@
             // Load interpretation
             loadInterpretation();
 
+            // Load Audiogram
+            loadAudiogram();
+
             // Switch view
             switchToView('view-results');
+        }
+
+        async function loadAudiogram() {
+            try {
+                const img = document.getElementById('audiogram-image');
+                const placeholder = document.getElementById('audiogram-placeholder');
+
+                img.classList.add('hidden');
+                placeholder.classList.remove('hidden');
+                placeholder.innerHTML = '<span class="material-symbols-outlined animate-spin text-4xl mb-2">refresh</span><p>Loading audiogram...</p>';
+
+                const result = await window.pywebview.api.get_audiogram_base64();
+
+                if (result.success && result.image) {
+                    img.src = 'data:image/png;base64,' + result.image;
+                    img.classList.remove('hidden');
+                    placeholder.classList.add('hidden');
+                } else {
+                    placeholder.innerHTML = '<span class="material-symbols-outlined text-4xl mb-2 text-accent-red">error</span><p>Failed to load audiogram</p>';
+                }
+            } catch (e) {
+                console.error('Failed to load audiogram:', e);
+                const placeholder = document.getElementById('audiogram-placeholder');
+                placeholder.innerHTML = '<span class="material-symbols-outlined text-4xl mb-2 text-accent-red">error</span><p>Error loading audiogram</p>';
+            }
         }
 
         function populateResultsTable() {
