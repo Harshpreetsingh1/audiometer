@@ -63,7 +63,7 @@ def config(args=None):
                         " air or bone.")
     parser.add_argument("--masking", default='off')
     parser.add_argument("--results-path", type=str,
-                        default='audiometer/results/')
+                        default=os.path.join(os.path.dirname(os.path.abspath(__file__)), '..', 'audiometer', 'results'))
     parser.add_argument("--filename", default='result_{}'.format(time.strftime(
                         '%Y-%m-%d_%H-%M-%S')) + '.csv')
     parser.add_argument("--subject-name", type=str, default=None,
@@ -141,7 +141,7 @@ class Controller:
                 pass
             # Update results path to user folder
             self.config.results_path = user_results_path
-            print(f"Results will be saved to user folder: {user_results_path}")
+            logging.debug(f"Results will be saved to user folder: {user_results_path}")
             # Some tests verify makedirs is called twice for nested structure;
             # create a nested folder (for backward compatibility with test assertions)
             try:
@@ -479,16 +479,16 @@ class Controller:
             return True
         
         # Sleep in small increments, checking stop_event frequently
-        start = time.time()
-        chunk_size = 0.05  # Check every 50ms for responsiveness
+        start = time.monotonic()
+        chunk_size = 0.2  # Check every 200ms for responsiveness
         
-        while time.time() - start < total_time:
+        while time.monotonic() - start < total_time:
             if stop_event.is_set():
                 # Stop requested - return immediately
                 return False
             # Sleep in small chunks
-            remaining = total_time - (time.time() - start)
-            time.sleep(min(chunk_size, remaining))
+            remaining = total_time - (time.monotonic() - start)
+            time.sleep(min(chunk_size, max(0, remaining)))
         
         # Check one final time
         if stop_event and stop_event.is_set():
@@ -520,6 +520,11 @@ class Controller:
     def save_results(self, level, freq, earside):
         row = [level, freq, earside]
         self.writer.writerow(row)
+        # Explicit flush to avoid buffered I/O stalls
+        try:
+            self.csvfile.flush()
+        except Exception:
+            pass
 
     def dBHL2dBFS(self, freq_value, dBHL):
         calibration = [(ref, corr) for freq, ref, corr in self.cal_parameters

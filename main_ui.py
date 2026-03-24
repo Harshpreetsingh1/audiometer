@@ -137,6 +137,11 @@ class AudiometerUI(ttk.Window):
         self.test_lock = threading.Lock()
         self.last_progress = 0
         self.button_flash_active = False
+        # Clamped monotonic progress: track last displayed value for smooth transitions
+        self._last_displayed_progress = 0.0
+        # Debounced progress coalescing
+        self._pending_progress = None
+        self._progress_after_id = None
         # Flag indicating whether the Tk mainloop is active (set by main())
         self._mainloop_running = False
         
@@ -880,13 +885,12 @@ class AudiometerUI(ttk.Window):
                 pass
     
     def _on_test_completed(self, test):
-        """Handle test completion."""
+        """Handle test completion with preview prompt."""
         try:
             self._reset_ui_for_new_test()
 
             self.status_label.config(text="Test Completed!", bootstyle="success")
             self.ear_indicator_label.config(text="", bootstyle="warning")
-            # Ensure window is no longer forced topmost
             try:
                 self.attributes('-topmost', False)
             except Exception:
@@ -897,28 +901,213 @@ class AudiometerUI(ttk.Window):
                 pass
 
             self.progress_var.set(100)
+            self._last_displayed_progress = 0.0  # Reset for next test
             self.progress_text.config(text="100%")
 
-            # Open audiogram automatically
-            try:
-                csv_path = os.path.join(test.ctrl.config.results_path, test.ctrl.config.filename)
-                pdf_path = csv_path + '.pdf'
-                if os.path.exists(pdf_path):
-                    self._open_file(pdf_path)
-            except Exception as e:
-                print(f"Could not open audiogram: {e}")
-
-            # Show completion message
-            self._show_info(
-                "Hearing test completed!\n\n"
-                f"Results saved to:\n{test.ctrl.config.results_path}"
+            # Ask if user wants to preview results
+            preview = tk_messagebox.askyesno(
+                "Test Complete",
+                "Hearing test completed successfully!\n\n"
+                "Would you like to preview the results and audiogram?",
+                parent=self
             )
+            if preview:
+                self._show_results_page(test)
+            else:
+                try:
+                    self._show_info(
+                        f"Results saved to:\n{test.ctrl.config.results_path}"
+                    )
+                except Exception:
+                    pass
         except Exception as e:
             logging.debug(f"_on_test_completed UI update skipped due to error: {e}")
             try:
                 self.progress_var.set(100)
             except Exception:
                 pass
+    
+    def _show_results_page(self, test):
+        """Show a results window with audiogram, table, and interpretation."""
+        try:
+            import tkinter as tk
+            from tkinter import ttk as tkttk
+            
+            results_win = tk.Toplevel(self)
+            results_win.title("Test Results - Audiogram")
+            results_win.geometry("900x700")
+            results_win.minsize(800, 600)
+            
+            main_frame = tk.Frame(results_win, bg='#1a1a2e')
+            main_frame.pack(fill='both', expand=True, padx=10, pady=10)
+            
+            # Patient Info Header
+            header_frame = tk.Frame(main_frame, bg='#16213e', relief='ridge', bd=1)
+            header_frame.pack(fill='x', pady=(0, 10))
+            
+            patient_name = getattr(test.ctrl.config, 'subject_name', 'Unknown') or 'Unknown'
+            test_date = datetime.now().strftime('%Y-%m-%d %H:%M:%S')
+            
+            tk.Label(header_frame, text=f"Patient: {patient_name}",
+                     font=('Helvetica', 14, 'bold'), bg='#16213e', fg='white',
+                     anchor='w').pack(fill='x', padx=10, pady=(10, 2))
+            tk.Label(header_frame, text=f"Date: {test_date}",
+                     font=('Helvetica', 10), bg='#16213e', fg='#aaaaaa',
+                     anchor='w').pack(fill='x', padx=10, pady=(0, 10))
+            
+            # Audiogram Image
+            try:
+                csv_path = os.path.join(test.ctrl.config.results_path, test.ctrl.config.filename)
+                if os.path.exists(csv_path):
+                    from audiogram_visualizer import AudiogramPlotter
+                    import base64
+                    import io
+                    
+                    plotter = AudiogramPlotter(csv_path)
+                    b64_str = plotter.get_base64_image(dpi=100)
+                    plotter.close()
+                    
+                    img_data = base64.b64decode(b64_str)
+                    
+                    try:
+                        from PIL import Image, ImageTk
+                        img = Image.open(io.BytesIO(img_data))
+                        photo = ImageTk.PhotoImage(img)
+                    except ImportError:
+                        import tempfile
+                        tmp_path = os.path.join(tempfile.gettempdir(), 'audiometer_audiogram.png')
+                        with open(tmp_path, 'wb') as f:
+                            f.write(img_data)
+                        photo = tk.PhotoImage(file=tmp_path)
+                    
+                    audiogram_label = tk.Label(main_frame, image=photo, bg='#1a1a2e')
+                    audiogram_label.image = photo
+                    audiogram_label.pack(pady=(0, 10))
+                else:
+                    tk.Label(main_frame, text="Audiogram not available (CSV not found)",
+                             font=('Helvetica', 10), bg='#1a1a2e', fg='#ff6666').pack(pady=10)
+            except Exception as e:
+                tk.Label(main_frame, text=f"Could not generate audiogram: {e}",
+                         font=('Helvetica', 10), bg='#1a1a2e', fg='#ff6666').pack(pady=10)
+            
+            # Results Table
+            table_frame = tk.Frame(main_frame, bg='#16213e', relief='ridge', bd=1)
+            table_frame.pack(fill='x', pady=(0, 10))
+            
+            tk.Label(table_frame, text="Threshold Results",
+                     font=('Helvetica', 12, 'bold'), bg='#16213e', fg='white',
+                     anchor='w').pack(fill='x', padx=10, pady=(10, 5))
+            
+            results_data = []
+            try:
+                csv_path = os.path.join(test.ctrl.config.results_path, test.ctrl.config.filename)
+                if os.path.exists(csv_path):
+                    import csv
+                    with open(csv_path, 'r', encoding='utf-8') as f:
+                        reader = csv.reader(f)
+                        for row in reader:
+                            if len(row) >= 3 and row[2] in ['left', 'right']:
+                                try:
+                                    results_data.append({
+                                        'level': float(row[0]),
+                                        'freq': int(float(row[1])),
+                                        'ear': row[2]
+                                    })
+                                except ValueError:
+                                    pass
+                
+                if results_data:
+                    tree = tkttk.Treeview(table_frame, columns=('Frequency', 'Right Ear', 'Left Ear'),
+                                          show='headings', height=min(8, len(set(r['freq'] for r in results_data))))
+                    tree.heading('Frequency', text='Frequency (Hz)')
+                    tree.heading('Right Ear', text='Right Ear (dB)')
+                    tree.heading('Left Ear', text='Left Ear (dB)')
+                    tree.column('Frequency', width=150, anchor='center')
+                    tree.column('Right Ear', width=150, anchor='center')
+                    tree.column('Left Ear', width=150, anchor='center')
+                    
+                    freqs_set = sorted(set(r['freq'] for r in results_data))
+                    for freq in freqs_set:
+                        right_val = next((r['level'] for r in results_data if r['freq'] == freq and r['ear'] == 'right'), '--')
+                        left_val = next((r['level'] for r in results_data if r['freq'] == freq and r['ear'] == 'left'), '--')
+                        tree.insert('', 'end', values=(f"{freq}", f"{right_val}", f"{left_val}"))
+                    
+                    tree.pack(fill='x', padx=10, pady=(0, 10))
+                else:
+                    tk.Label(table_frame, text="No results data found",
+                             font=('Helvetica', 10), bg='#16213e', fg='#aaaaaa').pack(padx=10, pady=10)
+            except Exception as e:
+                tk.Label(table_frame, text=f"Error reading results: {e}",
+                         font=('Helvetica', 10), bg='#16213e', fg='#ff6666').pack(padx=10, pady=10)
+            
+            # Interpretation
+            left_ear = {}
+            right_ear = {}
+            interpretation = {}
+            try:
+                from interpretation_engine import InterpretationEngine
+                left_ear = {r['freq']: r['level'] for r in results_data if r['ear'] == 'left'}
+                right_ear = {r['freq']: r['level'] for r in results_data if r['ear'] == 'right'}
+                
+                if left_ear or right_ear:
+                    engine = InterpretationEngine()
+                    interpretation = engine.analyze(left_ear=left_ear, right_ear=right_ear)
+                    
+                    interp_frame = tk.Frame(main_frame, bg='#16213e', relief='ridge', bd=1)
+                    interp_frame.pack(fill='x', pady=(0, 10))
+                    
+                    tk.Label(interp_frame, text="Interpretation",
+                             font=('Helvetica', 12, 'bold'), bg='#16213e', fg='white',
+                             anchor='w').pack(fill='x', padx=10, pady=(10, 5))
+                    summary = interpretation.get('summary', 'No interpretation available')
+                    tk.Label(interp_frame, text=summary,
+                             font=('Helvetica', 10), bg='#16213e', fg='#cccccc',
+                             wraplength=800, justify='left', anchor='w').pack(fill='x', padx=10, pady=(0, 10))
+            except Exception as e:
+                logging.debug(f"Could not generate interpretation: {e}")
+            
+            # Action Buttons
+            btn_frame = tk.Frame(main_frame, bg='#1a1a2e')
+            btn_frame.pack(fill='x', pady=10)
+            
+            def save_pdf():
+                try:
+                    from pdf_report_generator import PDFReportGenerator
+                    from audiogram_visualizer import AudiogramPlotter
+                    csv_p = os.path.join(test.ctrl.config.results_path, test.ctrl.config.filename)
+                    audiogram_p = csv_p.replace('.csv', '_audiogram.png')
+                    if os.path.exists(csv_p):
+                        ap = AudiogramPlotter(csv_p)
+                        ap.plot_audiogram(audiogram_p)
+                        ap.close()
+                    pdf_path = csv_p.replace('.csv', '_report.pdf')
+                    gen = PDFReportGenerator(
+                        patient_data={'name': patient_name},
+                        test_results={'left': left_ear, 'right': right_ear},
+                        interpretation=interpretation,
+                        audiogram_path=audiogram_p if os.path.exists(audiogram_p) else None
+                    )
+                    gen.generate_report(pdf_path)
+                    self._open_file(pdf_path)
+                    tk_messagebox.showinfo("PDF Saved", f"Report saved to:\n{pdf_path}", parent=results_win)
+                except Exception as e:
+                    tk_messagebox.showerror("Error", f"Failed to generate PDF: {e}", parent=results_win)
+            
+            tk.Button(btn_frame, text="Save PDF Report", command=save_pdf,
+                      bg='#22c55e', fg='white', font=('Helvetica', 10, 'bold'),
+                      padx=15, pady=8).pack(side='left', padx=5)
+            tk.Button(btn_frame, text="Run Another Test",
+                      command=lambda: results_win.destroy(),
+                      bg='#3b82f6', fg='white', font=('Helvetica', 10, 'bold'),
+                      padx=15, pady=8).pack(side='left', padx=5)
+            tk.Button(btn_frame, text="Close",
+                      command=lambda: results_win.destroy(),
+                      bg='#6b7280', fg='white', font=('Helvetica', 10, 'bold'),
+                      padx=15, pady=8).pack(side='right', padx=5)
+            
+        except Exception as e:
+            logging.warning(f"Error showing results page: {e}")
+            tk_messagebox.showerror("Error", f"Could not show results page: {e}", parent=self)
     
     def _on_test_error(self, error_msg):
         """Handle test error."""
@@ -1017,21 +1206,58 @@ class AudiometerUI(ttk.Window):
     def _update_progress_bar(self, percentage):
         """Update progress bar from callback (Task 2).
         
-        This is called directly from the test thread via the progress_callback.
-        We use after() to ensure thread-safe UI updates.
+        Uses debounced coalescing: stores latest value, applies after 100ms.
         
         Args:
             percentage: Progress percentage as float (0.0-100.0)
         """
-        # Use functools.partial to avoid lambda closure issues
-        from functools import partial
-        self.after(0, partial(self._update_progress_bar_safe, percentage))
+        self._pending_progress = percentage
+        if self._progress_after_id is None:
+            self._progress_after_id = self.after(100, self._apply_pending_progress)
+    
+    def _apply_pending_progress(self):
+        """Apply the latest pending progress value (debounced)."""
+        self._progress_after_id = None
+        if self._pending_progress is not None:
+            val = self._pending_progress
+            self._pending_progress = None
+            self._update_progress_bar_safe(val)
     
     def _update_progress_bar_safe(self, percentage):
-        """Thread-safe progress bar update (called from main thread)."""
+        """Thread-safe progress bar update with clamped monotonic interpolation."""
         try:
-            self.progress_var.set(percentage)
-            # Get completed/total from test if available
+            if percentage < self._last_displayed_progress:
+                percentage = self._last_displayed_progress
+            
+            delta = percentage - self._last_displayed_progress
+            
+            if delta > 5 and percentage < 100:
+                self._interpolate_progress(self._last_displayed_progress, percentage, steps=10, interval=50)
+            else:
+                self._last_displayed_progress = percentage
+                self.progress_var.set(percentage)
+                self._update_progress_text(percentage)
+        except Exception as e:
+            logging.debug(f"Error updating progress bar: {e}")
+    
+    def _interpolate_progress(self, start, end, steps, interval, current_step=0):
+        """Smoothly interpolate progress bar from start to end over multiple frames."""
+        if current_step >= steps:
+            self._last_displayed_progress = end
+            self.progress_var.set(end)
+            self._update_progress_text(end)
+            return
+        
+        fraction = (current_step + 1) / steps
+        value = start + (end - start) * fraction
+        self._last_displayed_progress = value
+        self.progress_var.set(value)
+        self._update_progress_text(value)
+        self.after(interval, lambda: self._interpolate_progress(start, end, steps, interval, current_step + 1))
+    
+    def _update_progress_text(self, percentage):
+        """Update the progress text label."""
+        try:
             if self.current_test:
                 with self.test_lock:
                     if self.current_test:
@@ -1039,15 +1265,15 @@ class AudiometerUI(ttk.Window):
                         self.progress_text.config(text=f"{percentage:.1f}% ({completed}/{total})")
             else:
                 self.progress_text.config(text=f"{percentage:.1f}%")
-        except Exception as e:
-            print(f"Error updating progress bar: {e}")
+        except Exception:
+            pass
     
     def _poll_ui_updates(self):
         """Poll for UI state updates (status is now event-driven via callbacks)."""
         if self.is_running and self.current_test:
             pass  # Polling is no longer needed for primary UI state updates.
-        # Schedule next poll (every 100ms)
-        self.after(100, self._poll_ui_updates)
+        # Schedule next poll (every 500ms — reduced from 100ms to save CPU)
+        self.after(500, self._poll_ui_updates)
     
     def _generate_patient_id(self):
         """Generate a unique patient ID (Task 4).
