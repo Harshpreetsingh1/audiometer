@@ -97,10 +97,16 @@ class AudiometerAPI:
         self.current_patient_id: Optional[int] = None
         self.current_csv_path: Optional[str] = None
         self.current_audiogram_path: Optional[str] = None
+        # Bug Fix #1: Test mode tracking
+        self.test_mode: Optional[str] = None  # 'quick', 'mini', or 'full'
         
-        # Initialize database and interpretation engine
+        # Bug Fix #2: Progress throttling for _push_update
+        self._last_push_time: float = 0.0
+        self._last_pushed_progress: float = -1.0
+        
+        # Initialize database and interpretation engine (lazy loaded)
         self._init_database()
-        self.interpretation_engine = InterpretationEngine()
+        self.interpretation_engine = None
     
     def set_window(self, window: webview.Window):
         """Set the webview window reference for JS calls."""
@@ -757,21 +763,23 @@ class AudiometerAPI:
     # ============================================================
     
     def _on_progress_update(self, progress: float):
-        """Called when test progress updates."""
+        """Called when test progress updates. Throttled to ≥1% change."""
         self.current_progress = progress
-        self._push_update({'progress': progress})
+        if abs(progress - self._last_pushed_progress) >= 1.0 or progress >= 100:
+            self._last_pushed_progress = progress
+            self._push_update({'progress': progress})
     
     def _on_ear_change(self, ear: str):
         """Called when testing ear changes."""
         self.current_ear = ear
         logging.info(f"Testing ear: {ear}")
-        self._push_update({'ear': ear})
+        self._push_update({'ear': ear}, critical=True)
     
     def _on_freq_change(self, freq: int):
         """Called when testing frequency changes."""
         self.current_freq = freq
         logging.info(f"Testing frequency: {freq} Hz")
-        self._push_update({'frequency': freq})
+        self._push_update({'frequency': freq}, critical=True)
     
     def _on_threshold_determined(self, ear: str, freq: int, level: float):
         """Called when a threshold is determined for a frequency/ear (Task 4)."""
@@ -779,18 +787,38 @@ class AudiometerAPI:
             if ear in self.test_results:
                 self.test_results[ear][freq] = level
                 logging.info(f"Stored result: {ear} ear, {freq} Hz = {level} dB")
-        
-        # Push result to frontend for real-time storage
-        self._push_update({'result': {'ear': ear, 'frequency': freq, 'level': level}})
+        self._push_update({'result': {'ear': ear, 'frequency': freq, 'level': level}}, critical=True)
     
-    def _push_update(self, data: Dict[str, Any]):
-        """Push state update to JavaScript frontend."""
+    def _push_update(self, data: Dict[str, Any], critical: bool = False):
+        """Push state update to JavaScript frontend.
+        
+        Throttled to max 2 updates/sec for non-critical events.
+        """
         if self.window:
             try:
+                now = time.monotonic()
+                if not critical and now - self._last_push_time < 0.5:
+                    return
+                self._last_push_time = now
                 js_data = json.dumps(data)
                 self.window.evaluate_js(f'window.updateFromPython({js_data})')
             except Exception as e:
                 logging.debug(f"Failed to push update to JS: {e}")
+    
+    def get_audiogram_base64(self) -> Dict[str, Any]:
+        """Get base64-encoded audiogram image from latest test results."""
+        try:
+            csv_path = self.current_csv_path
+            if not csv_path or not os.path.exists(csv_path):
+                return {'success': False, 'error': 'No test results CSV found'}
+            from audiogram_visualizer import AudiogramPlotter
+            plotter = AudiogramPlotter(csv_path)
+            b64_image = plotter.get_base64_image(dpi=120)
+            plotter.close()
+            return {'success': True, 'image': b64_image, 'results': self.test_results}
+        except Exception as e:
+            logging.error(f"Failed to generate audiogram: {e}")
+            return {'success': False, 'error': str(e)}
 
 
 def get_html_path() -> str:
