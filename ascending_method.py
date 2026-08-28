@@ -180,16 +180,16 @@ class AscendingMethod:
         if self._total_steps == 0:
             return
         
+        # Adaptive estimate: use rolling average of actual trial counts
+        estimated = self.ESTIMATED_TRIALS_PER_FREQ
+        if self._trial_counts_history:
+            estimated = max(5, sum(self._trial_counts_history) // len(self._trial_counts_history))
+
         # Throttle: only fire callback at most once every 500ms
         now = time.monotonic()
         if now - self._last_progress_time < 0.5:
             return
         self._last_progress_time = now
-        
-        # Adaptive estimate: use rolling average of actual trial counts
-        estimated = self.ESTIMATED_TRIALS_PER_FREQ
-        if self._trial_counts_history:
-            estimated = max(5, sum(self._trial_counts_history) // len(self._trial_counts_history))
         
         # Calculate base progress (completed frequencies)
         base_progress = (self._completed_steps / self._total_steps) * 100
@@ -800,4 +800,4 @@ if __name__ == '__main__':
     with AscendingMethod() as asc_method:
         asc_method.run()
 
-    print("Finished!")
+    logging.info("Finished!")
